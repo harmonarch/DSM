@@ -12,15 +12,15 @@
 
 DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **macOS、Windows、Android**，并在同一仓库提供**开发中的 iOS 源码实现**。它展示 DeepSeek 余额、消费、请求/Token 用量和按天趋势，不把数据发送给任何第三方。
 
-当前最新稳定版本是 **[v0.0.1](https://github.com/harmonarch/DSM/releases/tag/v0.0.1)**。macOS、Windows 和 Android 发布产物由 GitHub Actions 根据版本标签构建；iOS 目前只提供源码，TestFlight/App Store 分发等待 Apple Developer 账号。
+当前最新稳定版本是 **[v0.02](https://github.com/harmonarch/DSM/releases/tag/v0.02)**。macOS、Windows 和 Android 发布产物由 GitHub Actions 根据版本标签构建；iOS 目前只提供源码，TestFlight/App Store 分发等待 Apple Developer 账号。
 
 ## 平台状态与下载
 
 | 平台 | 当前状态 | 最新发布 / 运行方式 |
 | :--- | :--- | :--- |
-| macOS | 稳定版菜单栏 App | [DeepSeekMeter-0.0.1-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-0.0.1-macOS.dmg) |
-| Windows | 稳定版系统托盘 App | [DeepSeekMeter-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-win-x64.zip) |
-| Android | A4 已完成；提供直装 APK | [DeepSeekMeter-v0.0.1-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-v0.0.1-android.apk) |
+| macOS | 稳定版菜单栏 App | [DSM-0.02-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-0.02-macOS.dmg) |
+| Windows | 稳定版系统托盘 App | [DSM-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-win-x64.zip) |
+| Android | A4 已完成；提供直装 APK | [DSM-v0.02-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-v0.02-android.apk) |
 | iOS | M1–M5 源码实现完成，尚未公开分发 | 从 [ios/](ios/README.zh-CN.md) 源码构建 |
 
 ## 功能
@@ -60,14 +60,14 @@ DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **mac
 
 ### macOS
 
-1. 在 [Releases 页面](https://github.com/harmonarch/DSM/releases) 下载最新 DeepSeekMeter-<版本>-macOS.dmg。
+1. 在 [Releases 页面](https://github.com/harmonarch/DSM/releases) 下载最新 DSM-<版本>-macOS.dmg。
 2. 打开 DMG，将 DeepSeekMeter.app 拖到 Applications 快捷方式上。
 3. 首次启动时右键 App → **打开**。Release 使用 ad-hoc 签名，Gatekeeper 会询问一次；要面向普通用户消除提示，需要 Developer ID 签名并完成公证。
 4. 点击菜单栏鲸鱼图标，选择「登录」。
 
 ### Windows
 
-1. 在 [Releases 页面](https://github.com/harmonarch/DSM/releases) 下载 DeepSeekMeter-win-x64.zip。
+1. 在 [Releases 页面](https://github.com/harmonarch/DSM/releases) 下载 DSM-win-x64.zip。
 2. 解压后运行 DeepSeekMeter.exe；自包含 Release 不需要 .NET SDK。
 3. 如果内嵌 WebView2 登录不可用，可使用内置「手动粘贴 Token」兜底。
 
@@ -75,7 +75,7 @@ DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **mac
 
 ### Android
 
-1. 直链下载 [DeepSeekMeter-v0.0.1-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-v0.0.1-android.apk)。
+1. 直链下载 [DSM-v0.02-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-v0.02-android.apk)。
 2. 以侧载 APK 方式安装；Android 可能要求允许打开该文件的应用安装未知来源应用。
 3. APK 使用 debug 签名，便于直装，不代表 Play 商店发布或发布者身份认证。
 

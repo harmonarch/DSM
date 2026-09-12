@@ -12,15 +12,15 @@
 
 DeepSeekMeter is a lightweight, privacy-first account monitor for **macOS, Windows and Android**, with an **iOS source build** in the same repository. It shows your DeepSeek balance, spending, request/token usage and daily trends without sending data to a third party.
 
-The latest stable release is **[v0.0.1](https://github.com/harmonarch/DSM/releases/tag/v0.0.1)**. macOS, Windows and Android release artifacts are built by GitHub Actions from a version tag; iOS is currently source-only while TestFlight/App Store distribution is pending an Apple Developer account.
+The latest stable release is **[v0.02](https://github.com/harmonarch/DSM/releases/tag/v0.02)**. macOS, Windows and Android release artifacts are built by GitHub Actions from a version tag; iOS is currently source-only while TestFlight/App Store distribution is pending an Apple Developer account.
 
 ## Platform status and downloads
 
 | Platform | Current status | Latest release / run path |
 | :--- | :--- | :--- |
-| macOS | Stable menu bar app | [DeepSeekMeter-0.0.1-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-0.0.1-macOS.dmg) |
-| Windows | Stable system-tray app | [DeepSeekMeter-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-win-x64.zip) |
-| Android | A4 complete; direct-install APK | [DeepSeekMeter-v0.0.1-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.0.1/DeepSeekMeter-v0.0.1-android.apk) |
+| macOS | Stable menu bar app | [DSM-0.02-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-0.02-macOS.dmg) |
+| Windows | Stable system-tray app | [DSM-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-win-x64.zip) |
+| Android | A4 complete; direct-install APK | [DSM-v0.02-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.02/DSM-v0.02-android.apk) |
 | iOS | M1–M5 source implementation complete; distribution not published | Build from [ios/](ios/README.md) |
 
 ## Features
@@ -60,14 +60,14 @@ The latest stable release is **[v0.0.1](https://github.com/harmonarch/DSM/releas
 
 ### macOS
 
-1. Download the latest DeepSeekMeter-<version>-macOS.dmg from the [Releases page](https://github.com/harmonarch/DSM/releases).
+1. Download the latest DSM-<version>-macOS.dmg from the [Releases page](https://github.com/harmonarch/DSM/releases).
 2. Open the DMG and drag DeepSeekMeter.app onto the Applications shortcut.
 3. On first launch, right-click the app and choose **Open**. The release is ad-hoc signed, so Gatekeeper asks once. A Developer ID-signed and notarized build is required to remove that warning for general distribution.
 4. Click the whale icon in the menu bar and choose **Log in**.
 
 ### Windows
 
-1. Download DeepSeekMeter-win-x64.zip from the [Releases page](https://github.com/harmonarch/DSM/releases).
+1. Download DSM-win-x64.zip from the [Releases page](https://github.com/harmonarch/DSM/releases).
 2. Extract it and run DeepSeekMeter.exe; no .NET SDK is needed for the self-contained release.
 3. If the embedded WebView2 login is unavailable, use the built-in **Paste Token** fallback.
 
@@ -75,7 +75,7 @@ See the [Windows guide](windows/README.md) for source builds, storage details an
 
 ### Android
 
-1. Download DeepSeekMeter-v0.0.1-android.apk from the [v0.0.1 Release](https://github.com/harmonarch/DSM/releases/tag/v0.0.1).
+1. Download DSM-v0.02-android.apk from the [v0.02 Release](https://github.com/harmonarch/DSM/releases/tag/v0.02).
 2. Install it as a sideloaded APK. Android may require allowing installs from the app used to open the file.
 3. The APK is debug-signed for direct installation and is not a Play Store or publisher-identity build.
 
