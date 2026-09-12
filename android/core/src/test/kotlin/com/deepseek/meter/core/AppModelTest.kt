@@ -73,8 +73,22 @@ class AppModelTest {
     companion object {
         const val CURRENT_USER = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"id":"u_1","email":"dev@example.com","currency":"USD"}}}"""
         const val EXPIRED = """{"code":0,"msg":"","data":{"biz_code":40002,"biz_msg":"token 失效","biz_data":null}}"""
-        const val SUMMARY = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"normal_wallets":[{"currency":"CNY","balance":"40.2492316400000000","token_estimation":"0"}],"bonus_wallets":[{"currency":"CNY","balance":"0","token_estimation":"0"}],"total_costs":[{"currency":"CNY","amount":"19.7507683600000000"}]}}}"""
-        const val BY_KEY_AMOUNT = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":1785513600,"end":1788192000,"bucket":86400,"models":["deepseek-v4-pro"],"series":[{"api_key":{"tracking_id":"test-tracking","name":"test-key","sensitive_id":"sk-xxx","valid":true},"model":"deepseek-v4-pro","buckets":[{"time":1785513600,"usage":{"REQUEST":2,"RESPONSE_TOKEN":100}},{"time":1785600000,"usage":{"REQUEST":5,"RESPONSE_TOKEN":200}}]}]}}}"""
-        const val BY_KEY_COST = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":1785513600,"end":1788192000,"bucket":86400,"models":["deepseek-v4-pro"],"data":[{"currency":"CNY","series":[{"api_key":{"tracking_id":"test-tracking","name":"test-key","sensitive_id":"sk-xxx","valid":true},"model":"deepseek-v4-pro","buckets":[{"time":1785513600,"cost":"1.5"},{"time":1785600000,"cost":"2.5"}]}]}]}}}"""
+        const val SUMMARY = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"normal_wallets":[{"currency":"CNY","balance":"40.2492316400000000","token_estimation":"0"}],"bonus_wallets":[{"currency":"CNY","balance":"0","token_estimation":"0"}],"total_costs":[{"currency":"CNY","amount":"19.7507683600000000"}]}}}}"""
+
+        // AppModel 用例的桶时间按「当前月」动态生成：fetchUsage 按真实当月窗口聚合，
+        // 固定时间戳的样例跨月后会落在窗口外被过滤，聚合断言随之失效（跨月时间炸弹）
+        private val MONTH_START_TS: Long = run {
+            val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Shanghai"))
+            cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+            cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+            cal.set(java.util.Calendar.MINUTE, 0)
+            cal.set(java.util.Calendar.SECOND, 0)
+            cal.set(java.util.Calendar.MILLISECOND, 0)
+            cal.timeInMillis / 1000
+        }
+        private val SECOND_DAY_TS: Long = MONTH_START_TS + 86400
+
+        val BY_KEY_AMOUNT = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":$MONTH_START_TS,"end":${MONTH_START_TS + 86400 * 31},"bucket":86400,"models":["deepseek-v4-pro"],"series":[{"api_key":{"tracking_id":"test-tracking","name":"test-key","sensitive_id":"sk-xxx","valid":true},"model":"deepseek-v4-pro","buckets":[{"time":$MONTH_START_TS,"usage":{"REQUEST":2,"RESPONSE_TOKEN":100}},{"time":$SECOND_DAY_TS,"usage":{"REQUEST":5,"RESPONSE_TOKEN":200}}]}]}}}"""
+        val BY_KEY_COST = """{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":$MONTH_START_TS,"end":${MONTH_START_TS + 86400 * 31},"bucket":86400,"models":["deepseek-v4-pro"],"data":[{"currency":"CNY","series":[{"api_key":{"tracking_id":"test-tracking","name":"test-key","sensitive_id":"sk-xxx","valid":true},"model":"deepseek-v4-pro","buckets":[{"time":$MONTH_START_TS,"cost":"1.5"},{"time":$SECOND_DAY_TS,"cost":"2.5"}]}]}]}}}"""
     }
 }
