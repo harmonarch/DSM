@@ -27,13 +27,13 @@ jobs:
           STAGE=$(mktemp -d)
           cp -R build/DeepSeekMeter.app "$STAGE/"
           ln -s /Applications "$STAGE/Applications"
-          hdiutil create -volname "DeepSeekMeter" -srcfolder "$STAGE" -ov -format UDZO "build/DeepSeekMeter-${VERSION}-macOS.dmg"
+          hdiutil create -volname "DeepSeekMeter" -srcfolder "$STAGE" -ov -format UDZO "build/DSM-${VERSION}-macOS.dmg"
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macOS-dmg
-          path: build/DeepSeekMeter-*-macOS.dmg
+          path: build/DSM-*-macOS.dmg
 
   build-windows:
     name: Build Windows
@@ -58,17 +58,17 @@ jobs:
       - name: Package ZIP
         shell: pwsh
         run: |
-          $stage = "windows/publish/DeepSeekMeter-win-x64"
+          $stage = "windows/publish/DSM-win-x64"
           if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
           New-Item -ItemType Directory -Path $stage | Out-Null
           Copy-Item -Path "windows/publish/win-x64/*" -Destination $stage -Recurse
-          Compress-Archive -Path $stage -DestinationPath "windows/publish/DeepSeekMeter-win-x64.zip"
+          Compress-Archive -Path $stage -DestinationPath "windows/publish/DSM-win-x64.zip"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-zip
-          path: windows/publish/DeepSeekMeter-win-x64.zip
+          path: windows/publish/DSM-win-x64.zip
 
   build-android:
     name: Build Android APK
@@ -123,7 +123,7 @@ jobs:
           path: artifacts
 
       - name: Rename Android APK (with version)
-        run: mv artifacts/app-release.apk "artifacts/DeepSeekMeter-$GITHUB_REF_NAME-android.apk"
+        run: mv artifacts/app-release.apk "artifacts/DSM-$GITHUB_REF_NAME-android.apk"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
