@@ -25,7 +25,7 @@ DeepSeekMeter 的 Windows 版本是一个轻量的**系统托盘 App**，用于�
 
 ### 从 Release 下载
 
-1. 在 [Releases 页面](https://github.com/pppolf/DeepSeekMeter/releases)下载 DeepSeekMeter-win-x64.zip。
+1. 在 [Releases 页面](https://github.com/harmonarch/DSM/releases)下载 DSM-win-x64.zip。
 2. 解压到当前用户可写入 WebView2 数据的目录。
 3. 运行 DeepSeekMeter.exe，无需安装程序或 .NET SDK。
 4. 点击托盘图标，选择「登录」，在 platform.deepseek.com 官方页面完成登录。

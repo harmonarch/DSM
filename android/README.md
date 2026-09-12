@@ -2,7 +2,7 @@
 
 The Android version of DeepSeekMeter lets you check your DeepSeek balance, spending and token usage on the go. It is feature-aligned with the [macOS app](../README.en.md), [Windows app](../windows/README.md) and [iOS source build](../ios/README.md), using the same platform API contract.
 
-The current release is **[v0.3.1](https://github.com/pppolf/DeepSeekMeter/releases/tag/v0.3.1)**. The Release page contains a direct-install APK named DeepSeekMeter-v0.3.1-android.apk.
+The current release is **[v0.0.3](https://github.com/harmonarch/DSM/releases/tag/v0.0.3)**. The Release page contains a direct-install APK named DSM-v0.0.3-android.apk.
 
 > **Status:** A1 skeleton ✅ / A2 core + JVM tests ✅ / A3 Compose app ✅ / **A4 polish ✅** (lifecycle-aware foreground polling, WorkManager background refresh, low-balance notifications, Android 13+ permission UX, WebView popups, PR CI app build and maintainer-recorded real-device QA matrix). A5 widget and store distribution are planned. See [MOBILE-PLAN.md](../MOBILE-PLAN.md), section 4, for the full plan and D6 WorkManager decision.
 
@@ -28,7 +28,7 @@ Build metadata: versionName 0.3.1, versionCode 2, minSdk 26, targetSdk/compileSd
 
 ### Install the latest APK
 
-1. Download DeepSeekMeter-v0.3.1-android.apk from the [v0.3.1 Release](https://github.com/pppolf/DeepSeekMeter/releases/tag/v0.3.1).
+1. Download DSM-v0.0.3-android.apk from the [v0.0.3 Release](https://github.com/harmonarch/DSM/releases/tag/v0.0.3).
 2. Install it as a sideloaded APK. Android may ask you to allow the file manager or browser to install unknown apps.
 3. The APK is signed with the Gradle debug key for reproducible direct installation. It is not a Play Store or publisher-identity build.
 4. Open the app, allow notifications if you want low-balance alerts, and choose **Log in**.
