@@ -33,6 +33,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -141,6 +142,8 @@ internal fun SettingsScreen(state: AppModel.State, controller: AppController, on
             onOpenSettings = { notifier.openNotificationSettings() },
             onSendTest = { notifier.notifyLowBalance(0.5, "CNY") }
         )
+        Spacer(Modifier.height(14.dp))
+        UpdateCard(updateManager = controller.updateManager)
         Spacer(Modifier.height(14.dp))
         PrivacyCard()
     }
@@ -305,6 +308,77 @@ private fun NotificationCard(
             }
         }
     }
+}
+
+// MARK: - 应用内更新卡（GitHub Release 检查 / 自动下载 / 覆盖安装）
+
+@Composable
+private fun UpdateCard(updateManager: UpdateManager) {
+    val state = updateManager.state
+    MeterCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f)) {
+                Text("应用内更新", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    updateStateText(state),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (state is UpdateState.Failed) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = updateManager.autoCheck, onCheckedChange = { updateManager.autoCheck = it })
+        }
+        when (val s = state) {
+            is UpdateState.Idle -> {
+                Spacer(Modifier.height(6.dp))
+                TextButton(onClick = { updateManager.checkForUpdate() }, contentPadding = PaddingValues(start = 0.dp)) {
+                    Text("检查更新")
+                }
+            }
+            is UpdateState.Downloading -> {
+                Spacer(Modifier.height(10.dp))
+                LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth())
+            }
+            is UpdateState.ReadyToInstall -> {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = {
+                        if (updateManager.canInstall()) updateManager.installReadyApk()
+                        else updateManager.openInstallPermissionSettings()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                ) {
+                    Text("安装 v" + s.version + " 并重启", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            is UpdateState.Failed -> {
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    TextButton(onClick = { updateManager.checkForUpdate() }, contentPadding = PaddingValues(start = 0.dp)) {
+                        Text("重试")
+                    }
+                    if (updateManager.hasStagedApk) {
+                        TextButton(onClick = { updateManager.installReadyApk() }) {
+                            Text("重新安装")
+                        }
+                    }
+                }
+            }
+            is UpdateState.Checking, is UpdateState.UpToDate, is UpdateState.Installing -> {}
+        }
+    }
+}
+
+private fun updateStateText(state: UpdateState): String = when (state) {
+    is UpdateState.Idle -> "启动时自动检查 GitHub 新版本（仅读取，不上传任何数据）"
+    is UpdateState.Checking -> "检查中…"
+    is UpdateState.UpToDate -> "已是最新版本 ✓"
+    is UpdateState.Downloading -> "正在下载新版本…"
+    is UpdateState.ReadyToInstall -> "新版本已就绪，确认后覆盖安装（余额与设置保留）"
+    is UpdateState.Installing -> "正在安装…"
+    is UpdateState.Failed -> state.message
 }
 
 // MARK: - 隐私卡
