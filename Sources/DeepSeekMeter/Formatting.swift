@@ -69,3 +69,15 @@ func isVersion(_ a: String, newerThan b: String) -> Bool {
     }
     return false
 }
+
+/// 从 GitHub 网页端 /releases/latest 的 302 Location 解析最新 tag。
+/// Location 可能是绝对路径（/owner/repo/releases/tag/v0.1.0）或完整 URL，
+/// 兼容两种形态；解析不到 tag 段返回 nil。
+func latestTag(fromReleaseRedirectPath path: String) -> String? {
+    guard let range = path.range(of: "/releases/tag/") else { return nil }
+    var tag = String(path[range.upperBound...])
+    if let cut = tag.firstIndex(where: { $0 == "?" || $0 == "#" }) {
+        tag = String(tag[..<cut])
+    }
+    return tag.isEmpty ? nil : tag
+}
