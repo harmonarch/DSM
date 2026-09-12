@@ -3,9 +3,14 @@ package com.deepseek.meter.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -15,9 +20,19 @@ import androidx.lifecycle.LifecycleEventObserver
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 全屏绘制到状态栏/导航栏之下：M3 Scaffold + NavigationBar + 下拉刷新需要 edge-to-edge 画布
+        enableEdgeToEdge()
         setContent {
             DeepSeekMeterTheme {
-                DeepSeekMeterApp(rememberAppController())
+                // Surface 提供画布底色与 contentColor：
+                // 根布局没有 Scaffold，缺了它文字会落到默认黑色、深色模式失去底色
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                    contentColor = MaterialTheme.colorScheme.onBackground
+                ) {
+                    DeepSeekMeterApp(rememberAppController())
+                }
             }
         }
     }

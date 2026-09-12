@@ -1,3 +1,9 @@
+// 设置：账号（登录/退出）、自动刷新、低余额通知、隐私说明（Material 3）。
+// 通知开关与后台 Worker 生命周期闭环（Issue #15）：
+//  OFF→ON：权限通过后保存 enabled=true 并注册唯一周期任务（UPDATE）；
+//  ON→OFF：保存 enabled=false、取消唯一任务、重置 alerted 状态；
+//  Worker 每次执行前还会二次检查开关（双重保障）。
+// 滚动与边距由根布局（DeepSeekMeterApp）提供，这里只负责内容本身。
 package com.deepseek.meter.app
 
 import android.Manifest
@@ -5,19 +11,28 @@ import android.content.Context
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
@@ -30,8 +45,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.deepseek.meter.app.background.BackgroundRefreshScheduler
 import com.deepseek.meter.app.background.BackgroundRefreshWorker
@@ -39,17 +55,11 @@ import com.deepseek.meter.app.notification.LowBalanceNotifier
 import com.deepseek.meter.core.AppModel
 import com.deepseek.meter.core.DataStatus
 import com.deepseek.meter.core.LowBalancePolicy
+import com.deepseek.meter.core.currencySymbol
 import com.deepseek.meter.core.format
 
-/**
- * 设置：账号（登录/退出）、刷新间隔、低余额通知、隐私说明（对齐 iOS SettingsView）。
- * 通知开关与后台 Worker 生命周期闭环（Issue #15）：
- *  OFF→ON：权限通过后保存 enabled=true 并注册唯一周期任务（UPDATE）；
- *  ON→OFF：保存 enabled=false、取消唯一任务、重置 alerted 状态；
- *  Worker 每次执行前还会二次检查开关（双重保障）。
- */
 @Composable
-fun SettingsScreen(state: AppModel.State, controller: AppController, onLogin: () -> Unit) {
+internal fun SettingsScreen(state: AppModel.State, controller: AppController, onLogin: () -> Unit) {
     val context = LocalContext.current
 
     // ---- 低余额通知状态（Issue #15） ----
@@ -109,123 +119,206 @@ fun SettingsScreen(state: AppModel.State, controller: AppController, onLogin: ()
         BackgroundRefreshScheduler.cancel(context)
     }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-        Text("设置", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(12.dp))
+    Column(Modifier.fillMaxWidth()) {
+        Text("设置", style = MaterialTheme.typography.headlineSmall)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            "DeepSeekMeter · v" + BuildConfig.VERSION_NAME,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(18.dp))
 
-        Card(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("账号", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                state.userName?.takeIf { it.isNotEmpty() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
-                    Spacer(Modifier.height(8.dp))
-                }
-                Row {
-                    if (state.status == DataStatus.NOT_LOGGED_IN) {
-                        Button(onClick = onLogin) { Text("登录") }
-                    } else {
-                        OutlinedButton(onClick = onLogin) { Text("重新登录") }
-                        Spacer(Modifier.width(12.dp))
-                        Button(onClick = { controller.clearToken() }) { Text("退出登录") }
-                    }
-                }
-            }
-        }
+        AccountCard(state, onLogin, onLogout = { controller.clearToken() })
+        Spacer(Modifier.height(14.dp))
+        RefreshIntervalCard(controller)
+        Spacer(Modifier.height(14.dp))
+        NotificationCard(
+            alertsEnabled = alertsEnabled,
+            showPermissionNote = showPermissionNote,
+            permissionDenialCount = permissionDenialCount,
+            onToggle = { on -> if (on) enableAlerts() else disableAlerts() },
+            onOpenSettings = { notifier.openNotificationSettings() },
+            onSendTest = { notifier.notifyLowBalance(0.5, "CNY") }
+        )
+        Spacer(Modifier.height(14.dp))
+        PrivacyCard()
+    }
+}
 
-        Spacer(Modifier.height(12.dp))
-        Card(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("自动刷新", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                val options = listOf(
-                    15L to "15秒",
-                    30L to "30秒",
-                    60L to "1分钟",
-                    300L to "5分钟",
-                    600L to "10分钟"
+// MARK: - 账号卡（鲸鱼娘头像 + 登录态）
+
+@Composable
+private fun AccountCard(state: AppModel.State, onLogin: () -> Unit, onLogout: () -> Unit) {
+    MeterCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primaryContainer)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.whale_girl),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(4.dp)
                 )
-                Column {
-                    options.forEach { (seconds, label) ->
-                        val selected = controller.refreshIntervalSeconds == seconds
-                        TextButton(
-                            onClick = { controller.refreshIntervalSeconds = seconds },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                                Text(
-                                    if (selected) "● " + label else "○ " + label,
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                                Spacer(Modifier.weight(1f))
-                                if (selected) {
-                                    Text("✓", color = MaterialTheme.colorScheme.primary)
-                                }
-                            }
-                        }
-                    }
-                }
             }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Card(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("通知", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        "低余额提醒：余额低于 " + format(LowBalancePolicy.DEFAULT_THRESHOLD) + "（当前币种单位）时本地通知，纯本地无推送",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Switch(
-                        checked = alertsEnabled,
-                        onCheckedChange = { on -> if (on) enableAlerts() else disableAlerts() }
-                    )
-                }
-                if (showPermissionNote) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (permissionDenialCount >= 2)
-                            "通知权限已关闭：请在系统设置中允许 DeepSeekMeter 通知后重试"
-                        else
-                            "通知权限被拒绝：可再次点击开关重试，或打开系统设置开启",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    TextButton(onClick = { notifier.openNotificationSettings() }) {
-                        Text("打开系统通知设置")
-                    }
-                }
-                // QA 入口（仅 debug 构建）：低余额通知管线真机验证用——
-                // 渠道/权限/图标/文案/点击跳转与真实余额无关，无需真实低余额账户（#16 QA 矩阵）
-                if (BuildConfig.DEBUG) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "QA：发送一条测试低余额通知（仅 debug 构建显示）",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                    TextButton(onClick = { notifier.notifyLowBalance(0.5, "CNY") }) {
-                        Text("发送测试通知")
-                    }
-                }
-            }
-        }
-
-        Spacer(Modifier.height(12.dp))
-        Card(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                Text("隐私", style = MaterialTheme.typography.titleMedium)
-                Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
                 Text(
-                    "所有数据来自 DeepSeek 官方平台接口，使用你自己的登录态，不会发送到任何第三方。Token 使用 Android Keystore 加密后保存在本机，「退出登录」可随时清除。",
+                    state.userName?.takeIf { it.isNotEmpty() } ?: "未登录",
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    when (state.status) {
+                        DataStatus.NOT_LOGGED_IN -> "登录后开始记录用量"
+                        DataStatus.TOKEN_EXPIRED -> "登录已过期，请重新登录"
+                        else -> "已连接 DeepSeek 平台"
+                    },
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
                 )
             }
         }
+        Spacer(Modifier.height(16.dp))
+        if (state.status == DataStatus.NOT_LOGGED_IN) {
+            Button(
+                onClick = onLogin,
+                modifier = Modifier.fillMaxWidth().height(44.dp)
+            ) {
+                Text("登录 DeepSeek 平台", style = MaterialTheme.typography.labelLarge)
+            }
+        } else {
+            Row {
+                FilledTonalButton(onClick = onLogin, modifier = Modifier.weight(1f).height(44.dp)) {
+                    Text("重新登录")
+                }
+                Spacer(Modifier.width(10.dp))
+                OutlinedButton(onClick = onLogout, modifier = Modifier.weight(1f).height(44.dp)) {
+                    Text("退出登录", color = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - 自动刷新卡（筛选芯片选择前台轮询间隔）
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RefreshIntervalCard(controller: AppController) {
+    MeterCard {
+        Text("自动刷新", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            "前台轮询间隔，进入后台自动暂停",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IntervalOption("15 秒", 15L, controller)
+            IntervalOption("30 秒", 30L, controller)
+            IntervalOption("1 分钟", 60L, controller)
+            IntervalOption("5 分钟", 300L, controller)
+            IntervalOption("10 分钟", 600L, controller)
+        }
+    }
+}
+
+@Composable
+private fun IntervalOption(label: String, seconds: Long, controller: AppController) {
+    FilterChip(
+        selected = controller.refreshIntervalSeconds == seconds,
+        onClick = { controller.refreshIntervalSeconds = seconds },
+        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+        colors = FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+    )
+}
+
+// MARK: - 通知卡（低余额提醒开关 + 权限三态 + QA 入口）
+
+@Composable
+private fun NotificationCard(
+    alertsEnabled: Boolean,
+    showPermissionNote: Boolean,
+    permissionDenialCount: Int,
+    onToggle: (Boolean) -> Unit,
+    onOpenSettings: () -> Unit,
+    onSendTest: () -> Unit
+) {
+    MeterCard {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.weight(1f)) {
+                Text("低余额提醒", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    "余额低于 " + currencySymbol("CNY") + format(LowBalancePolicy.DEFAULT_THRESHOLD) +
+                        " 时本地通知，纯本地无推送",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Switch(checked = alertsEnabled, onCheckedChange = onToggle)
+        }
+        if (showPermissionNote) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                if (permissionDenialCount >= 2)
+                    "通知权限已关闭：请在系统设置中允许 DeepSeekMeter 通知后重试"
+                else
+                    "通知权限被拒绝：可再次点击开关重试，或打开系统设置开启",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+            TextButton(onClick = onOpenSettings, contentPadding = PaddingValues(start = 0.dp)) {
+                Text("打开系统通知设置")
+            }
+        }
+        // QA 入口（仅 debug 构建）：低余额通知管线真机验证用——
+        // 渠道/权限/图标/文案/点击跳转与真实余额无关，无需真实低余额账户（#16 QA 矩阵）
+        if (BuildConfig.DEBUG) {
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "发送一条测试低余额通知（仅调试构建）",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = onSendTest) { Text("发送") }
+            }
+        }
+    }
+}
+
+// MARK: - 隐私卡
+
+@Composable
+private fun PrivacyCard() {
+    MeterCard {
+        Text("隐私", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.height(7.dp))
+        Text(
+            "所有数据来自 DeepSeek 官方平台接口，使用你自己的登录态，不会发送到任何第三方。" +
+                "Token 使用 Android Keystore 加密后保存在本机，「退出登录」可随时清除。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
