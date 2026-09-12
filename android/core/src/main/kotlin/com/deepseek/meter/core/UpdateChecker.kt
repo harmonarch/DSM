@@ -48,4 +48,36 @@ object UpdateChecker {
         if (version.startsWith("v") || version.startsWith("V")) version = version.substring(1)
         return UpdateRelease(version, apkName, apkUrl!!, sumsUrl)
     }
+
+    /**
+     * 从 GitHub 网页端 /releases/latest 的 302 Location 解析最新 tag（API 限流兜底用）。
+     * Location 可能是绝对路径（/owner/repo/releases/tag/v0.1.0）或完整 URL，兼容两种形态；
+     * 解析不到 tag 段返回 null。对齐 macOS latestTag(fromReleaseRedirectPath:)。
+     */
+    fun parseRedirectTag(location: String): String? {
+        val marker = "/releases/tag/"
+        val start = location.indexOf(marker)
+        if (start < 0) return null
+        var tag = location.substring(start + marker.length)
+        val cut = tag.indexOfFirst { it == '?' || it == '#' }
+        if (cut >= 0) tag = tag.substring(0, cut)
+        return tag.ifEmpty { null }
+    }
+
+    /**
+     * 按网页端 302 解析出的 tag 推导 Release（API 限流兜底用）。
+     * 命名与 release.yml 固定流水线一致：tag 目录带 v，APK 资源名也带 v（DSM-v0.1.0-android.apk）。
+     */
+    fun releaseFromTag(tag: String): UpdateRelease {
+        var version = tag
+        if (version.startsWith("v") || version.startsWith("V")) version = version.substring(1)
+        val apkName = "DSM-$tag-android.apk"
+        val base = "https://github.com/$REPO_SLUG/releases/download/$tag"
+        return UpdateRelease(
+            version = version,
+            apkName = apkName,
+            apkUrl = "$base/$apkName",
+            sumsUrl = "$base/SHA256SUMS.txt",
+        )
+    }
 }

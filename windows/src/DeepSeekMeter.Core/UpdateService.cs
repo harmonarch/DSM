@@ -28,7 +28,7 @@ public sealed record UpdateSnapshot(
 /// <summary>
 /// GitHub Release 应用内更新（对齐 macOS 版 UpdateService.swift）：
 /// 检查 → 自动下载 → SHA256 校验 → 解包到暂存目录，替换与重启由上层（WPF）执行。
-/// 网络仅 GET api.github.com 与 Release 资源，不上报任何本地数据。
+/// 网络仅 GET api.github.com（限流 403/429 时兜底走 github.com 网页端 302）与 Release 资源，不上报任何本地数据。
 /// </summary>
 public sealed class UpdateService
 {
@@ -37,7 +37,12 @@ public sealed class UpdateService
 
     private static readonly string ReleasesApiUrl = $"https://api.github.com/repos/{RepoSlug}/releases/latest";
 
-    private static readonly HttpClient Http = CreateHttp();
+    private static readonly string ReleasesPageUrl = $"https://github.com/{RepoSlug}/releases/latest";
+
+    private static readonly HttpClient Http = CreateHttp(allowAutoRedirect: true);
+
+    /// <summary>禁止自动跟随重定向的客户端（网页端兜底读取 302 Location 用）。</summary>
+    private static readonly HttpClient NoRedirectHttp = CreateHttp(allowAutoRedirect: false);
 
     /// <summary>最新 Release 信息。</summary>
     public sealed record LatestRelease(string Version, string ZipName, string ZipUrl, string? SumsUrl);
@@ -56,9 +61,9 @@ public sealed class UpdateService
     public bool IsBusy =>
         State.Kind is UpdateStateKind.Checking or UpdateStateKind.Downloading or UpdateStateKind.Installing;
 
-    private static HttpClient CreateHttp()
+    private static HttpClient CreateHttp(bool allowAutoRedirect)
     {
-        var client = new HttpClient();
+        var client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = allowAutoRedirect });
         client.DefaultRequestHeaders.UserAgent.ParseAdd("DeepSeekMeter");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
         client.Timeout = TimeSpan.FromSeconds(120);
@@ -118,12 +123,34 @@ public sealed class UpdateService
 
     // MARK: - 检查 / 下载 / 校验
 
+    /// <summary>非 2xx 响应（携带状态码，供限流兜底判定）。</summary>
+    private sealed class HttpErrorException : InvalidOperationException
+    {
+        public int Code { get; }
+
+        public HttpErrorException(int code) : base($"HTTP {code}") { Code = code; }
+    }
+
+    /// <summary>拉取最新 Release：优先走 API；被限流（403/429，未认证限额 60 次/小时/IP，共享代理出口易耗尽）时走网页端 302 兜底。</summary>
     private async Task<LatestRelease> FetchLatestReleaseAsync()
+    {
+        try
+        {
+            return await FetchViaApiAsync();
+        }
+        catch (HttpErrorException ex) when (ex.Code is 403 or 429)
+        {
+            return await FetchViaRedirectAsync();
+        }
+    }
+
+    /// <summary>走 api.github.com 拉取（带资产列表，首选）。</summary>
+    private async Task<LatestRelease> FetchViaApiAsync()
     {
         using var response = await Http.GetAsync(ReleasesApiUrl);
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"HTTP {(int)response.StatusCode}");
+            throw new HttpErrorException((int)response.StatusCode);
         }
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var root = doc.RootElement;
@@ -153,6 +180,36 @@ public sealed class UpdateService
         var version = tag.Trim();
         if (version.StartsWith("v") || version.StartsWith("V")) version = version[1..];
         return new LatestRelease(version, zipName!, zipUrl, sumsUrl);
+    }
+
+    /// <summary>
+    /// 网页端兜底：github.com/&lt;repo&gt;/releases/latest 恒 302 到 /releases/tag/&lt;tag&gt;，不占 API 限额；
+    /// 资产下载 URL 按发布流水线固定命名推导（Windows 资源固定叫 DSM-win-x64.zip，无版本号）。
+    /// </summary>
+    private async Task<LatestRelease> FetchViaRedirectAsync()
+    {
+        using var response = await NoRedirectHttp.GetAsync(ReleasesPageUrl);
+        var tag = LatestTagFromRedirect(response.Headers.Location?.ToString())
+            ?? throw new InvalidOperationException($"更新源未返回最新版本（HTTP {(int)response.StatusCode}）");
+        var version = tag.Trim();
+        if (version.StartsWith("v") || version.StartsWith("V")) version = version[1..];
+        const string zipName = "DSM-win-x64.zip";
+        var zipUrl = $"https://github.com/{RepoSlug}/releases/download/{tag}/{zipName}";
+        var sumsUrl = $"https://github.com/{RepoSlug}/releases/download/{tag}/SHA256SUMS.txt";
+        return new LatestRelease(version, zipName, zipUrl, sumsUrl);
+    }
+
+    /// <summary>从 GitHub 网页端 /releases/latest 的 302 Location 解析最新 tag（绝对路径与完整 URL 兼容，解析不到返回 null）。</summary>
+    public static string? LatestTagFromRedirect(string? location)
+    {
+        if (string.IsNullOrEmpty(location)) return null;
+        const string marker = "/releases/tag/";
+        var start = location.IndexOf(marker, StringComparison.Ordinal);
+        if (start < 0) return null;
+        var tag = location[(start + marker.Length)..];
+        var cut = tag.IndexOfAny(['?', '#']);
+        if (cut >= 0) tag = tag[..cut];
+        return tag.Length == 0 ? null : tag;
     }
 
     /// <summary>下载更新包 ZIP 到临时文件（文件名沿用 Release 原始资源名，SHA256SUMS 按名匹配；流式写入，按 1% 步进回报进度）。</summary>

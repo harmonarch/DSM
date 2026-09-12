@@ -315,6 +315,13 @@ check(isVersion("1.0.1", newerThan: "1.0"), "缺段按 0 补齐可比较")
 check(isVersion("10.0", newerThan: "9.9"), "按数值而非字符串比较（10 > 9）")
 check(!isVersion("abc", newerThan: "0.0.1"), "非法版本按 0 处理不算更新")
 
+// 12.5 更新兜底：/releases/latest 302 Location 解析最新 tag（API 限流时走网页端）
+check(latestTag(fromReleaseRedirectPath: "/harmonarch/DSM/releases/tag/v0.1.0") == "v0.1.0", "绝对路径 Location 解析 tag")
+check(latestTag(fromReleaseRedirectPath: "https://github.com/harmonarch/DSM/releases/tag/v1.2.3") == "v1.2.3", "完整 URL Location 解析 tag")
+check(latestTag(fromReleaseRedirectPath: "/harmonarch/DSM/releases/tag/v0.1.0?x=1") == "v0.1.0", "剥离 query 参数")
+check(latestTag(fromReleaseRedirectPath: "/harmonarch/DSM/releases/latest") == nil, "无 tag 段返回 nil")
+check(latestTag(fromReleaseRedirectPath: "") == nil, "空串返回 nil")
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)

@@ -540,6 +540,14 @@ Check(Formatting.IsVersion("10.0", "9.9"), "按数值而非字符串比较（10 
 Check(!Formatting.IsVersion("abc", "0.0.1"), "非法版本按 0 处理不算更新");
 Check(!Formatting.IsVersion(null, "0"), "null 版本按 0 处理");
 
+// 20.5 更新兜底：/releases/latest 302 Location 解析最新 tag（API 限流 403/429 时走网页端，对齐 macOS/iOS/Android）
+Check(UpdateService.LatestTagFromRedirect("/harmonarch/DSM/releases/tag/v0.1.0") == "v0.1.0", "绝对路径 Location 解析 tag");
+Check(UpdateService.LatestTagFromRedirect("https://github.com/harmonarch/DSM/releases/tag/v1.2.3") == "v1.2.3", "完整 URL Location 解析 tag");
+Check(UpdateService.LatestTagFromRedirect("/harmonarch/DSM/releases/tag/v0.1.0?x=1") == "v0.1.0", "剥离 query 参数");
+Check(UpdateService.LatestTagFromRedirect("/harmonarch/DSM/releases/latest") == null, "无 tag 段返回 null");
+Check(UpdateService.LatestTagFromRedirect("") == null, "空串返回 null");
+Check(UpdateService.LatestTagFromRedirect(null) == null, "null 返回 null");
+
 if (failures > 0)
 {
     Console.WriteLine($"\n❌ {failures} 项未通过");

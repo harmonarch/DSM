@@ -48,7 +48,8 @@ enum UpdateError: LocalizedError {
 // MARK: - 更新服务
 
 /// GitHub Release 应用内更新：检查 → 自动下载 → SHA256 校验 → 用户确认后覆盖安装并重启。
-/// 网络仅 GET api.github.com 与 Release 资源（不上报任何本地数据，红线 5）；
+/// 网络仅 GET api.github.com（限流 403/429 时兜底走 github.com 网页端 302）与 Release 资源
+/// （不上报任何本地数据，红线 5）；
 /// 与 PlatformService（DeepSeek 平台接口）分属两个独立网络入口，互不依赖。
 @MainActor
 final class UpdateService: ObservableObject {
@@ -66,6 +67,11 @@ final class UpdateService: ObservableObject {
 
     /// 更新源仓库（GitHub Releases 提供 DMG / ZIP / APK 与 SHA256SUMS.txt）
     private static let repoSlug = "harmonarch/DSM"
+
+    /// 统一 User-Agent（GitHub 要求所有请求携带）
+    private static var userAgent: String {
+        "DeepSeekMeter/\(currentVersion ?? "dev") (+https://github.com/\(repoSlug))"
+    }
 
     @Published private(set) var state: State = .idle
 
@@ -149,14 +155,26 @@ final class UpdateService: ObservableObject {
         }
     }
 
-    /// 拉取最新 Release（GET /releases/latest，未认证限额 60 次/小时/IP，启动级频率足够）
+    /// 拉取最新 Release：优先走 API；被限流（403/429，未认证限额 60 次/小时/IP，
+    /// 共享代理出口 IP 极易耗尽）时改走网页端 302 重定向兜底
     private static func fetchLatestRelease() async throws -> ReleaseInfo {
+        do {
+            return try await fetchLatestReleaseViaAPI()
+        } catch let error as UpdateError {
+            guard case .http(let code) = error, code == 403 || code == 429 else { throw error }
+            return try await fetchLatestReleaseViaRedirect()
+        }
+    }
+
+    /// 走 api.github.com 拉取最新 Release（带资产列表，首选）
+    private static func fetchLatestReleaseViaAPI() async throws -> ReleaseInfo {
         guard let url = URL(string: "https://api.github.com/repos/\(repoSlug)/releases/latest") else {
             throw UpdateError.decoding("无效 URL")
         }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 15
         let data: Data
         let response: URLResponse
@@ -200,6 +218,41 @@ final class UpdateService: ObservableObject {
         return ReleaseInfo(version: version, zipName: asset.name, zipURL: zipURL, sumsURL: sumsURL)
     }
 
+    /// 网页端兜底：github.com/<repo>/releases/latest 恒 302 到 /releases/tag/<tag>，
+    /// 不占 api.github.com 限额；资产下载 URL 按发布流水线的固定命名推导
+    /// （release.yml：tag 目录带 v，资产名不带 v —— DSM-<版本>-macOS.zip / SHA256SUMS.txt）
+    private static func fetchLatestReleaseViaRedirect() async throws -> ReleaseInfo {
+        guard let url = URL(string: "https://github.com/\(repoSlug)/releases/latest") else {
+            throw UpdateError.decoding("无效 URL")
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+        let session = URLSession(configuration: .default, delegate: NoRedirectDelegate(), delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        let response: URLResponse
+        do {
+            (_, response) = try await session.data(for: request)
+        } catch {
+            throw UpdateError.network(error.localizedDescription)
+        }
+        guard let http = response as? HTTPURLResponse,
+              (300...399).contains(http.statusCode),
+              let location = http.value(forHTTPHeaderField: "Location"),
+              let tag = latestTag(fromReleaseRedirectPath: location) else {
+            throw UpdateError.decoding("更新源未返回最新版本（HTTP \((response as? HTTPURLResponse)?.statusCode ?? -1)）")
+        }
+        var version = tag
+        if version.hasPrefix("v") || version.hasPrefix("V") { version.removeFirst() }
+        let zipName = "DSM-\(version)-macOS.zip"
+        guard let zipURL = URL(string: "https://github.com/\(repoSlug)/releases/download/\(tag)/\(zipName)") else {
+            throw UpdateError.decoding("无效 URL")
+        }
+        let sumsURL = URL(string: "https://github.com/\(repoSlug)/releases/download/\(tag)/SHA256SUMS.txt")
+        return ReleaseInfo(version: version, zipName: zipName, zipURL: zipURL, sumsURL: sumsURL)
+    }
+
     /// 下载更新包 ZIP 到临时目录（delegate 桥接 async，回调进度）
     private static func downloadZip(
         _ release: ReleaseInfo,
@@ -217,6 +270,7 @@ final class UpdateService: ObservableObject {
     private static func verifyChecksum(zipURL: URL, sumsURL: URL?) async throws {
         guard let sumsURL else { return }
         var request = URLRequest(url: sumsURL)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.timeoutInterval = 15
         let data: Data
         do {
@@ -327,6 +381,17 @@ final class UpdateService: ObservableObject {
 
 // MARK: - ZIP 下载会话
 
+/// 禁止跟随重定向的会话代理：让 302 原样返回以便读取 Location 头
+/// （注意必须声明 URLSessionTaskDelegate 而非 URLSessionDelegate，否则重定向回调不会被调用）
+private final class NoRedirectDelegate: NSObject, URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask,
+                    willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest,
+                    completionHandler: @escaping (URLRequest?) -> Void) {
+        completionHandler(nil)
+    }
+}
+
 /// 单次 ZIP 下载：URLSessionDownloadDelegate 桥接 async/await，落盘到指定路径并回报进度
 private final class ZipDownloader: NSObject, URLSessionDownloadDelegate {
     private let destination: URL
@@ -361,6 +426,12 @@ private final class ZipDownloader: NSObject, URLSessionDownloadDelegate {
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask,
                     didFinishDownloadingTo location: URL) {
+        // HTTP 错误（如资产 404 页面）不会触发 didCompleteWithError，先校验状态码再落盘
+        if let http = downloadTask.response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            try? FileManager.default.removeItem(at: location)
+            moveError = UpdateError.http(http.statusCode)
+            return
+        }
         do {
             try FileManager.default.moveItem(at: location, to: destination)
             movedFileURL = destination
