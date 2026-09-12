@@ -23,6 +23,7 @@ public sealed class SettingsStore : INotifyPropertyChanged
     private string _platformUserName = "";
     private double _refreshInterval = 60;
     private bool _launchAtLogin;
+    private bool _autoCheckUpdates = true;
 
     /// <summary>构造完成后可读取的启动警告（迁移/解密失败），由应用启动后展示一次，不含 Token。</summary>
     public string? StartupWarning { get; private set; }
@@ -89,6 +90,27 @@ public sealed class SettingsStore : INotifyPropertyChanged
         }
     }
 
+    /// <summary>启动时自动检查 GitHub Release 新版本（仅 GET 读取，不上报任何本地数据）。</summary>
+    public bool AutoCheckUpdates
+    {
+        get => _autoCheckUpdates;
+        set
+        {
+            if (_autoCheckUpdates == value) return;
+            var previous = _autoCheckUpdates;
+            _autoCheckUpdates = value;
+            if (WriteSettings(_platformToken, _platformUserName, out var error))
+            {
+                OnPropertyChanged();
+            }
+            else
+            {
+                _autoCheckUpdates = previous;
+                SaveFailed?.Invoke(error ?? "设置保存失败");
+            }
+        }
+    }
+
     // MARK: - 原子凭据操作
 
     /// <summary>原子保存平台凭据：先加密并落盘成功，再更新内存；失败不改内存并返回脱敏错误。</summary>
@@ -131,6 +153,7 @@ public sealed class SettingsStore : INotifyPropertyChanged
         public string? PlatformUserName { get; set; }
         public double? RefreshInterval { get; set; }
         public bool? LaunchAtLogin { get; set; }
+        public bool? AutoCheckUpdates { get; set; }
     }
 
     private void Load()
@@ -146,6 +169,8 @@ public sealed class SettingsStore : INotifyPropertyChanged
             var loaded = (snap.RefreshInterval is > 0) ? snap.RefreshInterval!.Value : 60;
             _refreshInterval = IntervalOptions.Contains(loaded) ? loaded : 60;
             _launchAtLogin = snap.LaunchAtLogin ?? false;
+            // 未设置过时默认开启自动检查更新（只读 GitHub Release 元信息，README 隐私章节有披露）
+            _autoCheckUpdates = snap.AutoCheckUpdates ?? true;
 
             // Token：优先解密新版密文；否则迁移旧明文
             if (!string.IsNullOrEmpty(snap.PlatformTokenProtected))
@@ -213,6 +238,7 @@ public sealed class SettingsStore : INotifyPropertyChanged
                 PlatformUserName = userName,
                 RefreshInterval = _refreshInterval,
                 LaunchAtLogin = _launchAtLogin,
+                AutoCheckUpdates = _autoCheckUpdates,
             };
             var json = JsonSerializer.Serialize(snap, SnapshotOptions);
             var tmp = SettingsFilePath + ".tmp";

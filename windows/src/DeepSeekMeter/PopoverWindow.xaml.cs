@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -191,6 +192,7 @@ public partial class PopoverWindow : Window
         UpdateTrend();
         UpdateErrorBanner();
         UpdateSettings();
+        UpdateUpdateRow();
         UpdateFooter();
 
         _suppressEvents = true;
@@ -210,6 +212,9 @@ public partial class PopoverWindow : Window
 
             // 开机自启
             LaunchAtLoginBox.IsChecked = _model.Settings.LaunchAtLogin;
+
+            // 自动检查更新
+            AutoCheckUpdatesBox.IsChecked = _model.Settings.AutoCheckUpdates;
         }
         finally
         {
@@ -492,6 +497,90 @@ public partial class PopoverWindow : Window
         LogoutButton.Visibility = string.IsNullOrEmpty(_model.Settings.PlatformToken)
             ? Visibility.Collapsed
             : Visibility.Visible;
+        var version = typeof(PopoverWindow).Assembly.GetName().Version;
+        if (version is { } v)
+        {
+            VersionText.Text = $"v{v.Major}.{Math.Max(v.Minor, 0)}.{Math.Max(v.Build, 0)}";
+        }
+    }
+
+    // MARK: - 软件更新行
+
+    /// <summary>按更新状态渲染状态区（按钮 / 进度条 / 文案）。</summary>
+    private void UpdateUpdateRow()
+    {
+        var host = new StackPanel { Orientation = Orientation.Horizontal };
+        var state = _model.UpdateState;
+        switch (state.Kind)
+        {
+            case UpdateStateKind.Idle:
+                host.Children.Add(LinkButton("检查更新", (_, _) => _ = _model.CheckForUpdateAsync()));
+                break;
+            case UpdateStateKind.Checking:
+                host.Children.Add(HintText("检查中…"));
+                break;
+            case UpdateStateKind.UpToDate:
+                host.Children.Add(HintText("已是最新 ✓", Color.FromRgb(46, 160, 67)));
+                break;
+            case UpdateStateKind.Downloading:
+                var progressPanel = new StackPanel();
+                progressPanel.Children.Add(HintText($"正在下载 v{state.Version}…"));
+                progressPanel.Children.Add(new ProgressBar
+                {
+                    Width = 150,
+                    Height = 6,
+                    Minimum = 0,
+                    Maximum = 1,
+                    Value = state.Progress,
+                    Margin = new Thickness(0, 3, 0, 0),
+                });
+                host.Children.Add(progressPanel);
+                break;
+            case UpdateStateKind.ReadyToInstall:
+                var installButton = new Button
+                {
+                    Content = $"重启更新到 v{state.Version}",
+                    Style = (Style)Resources["PrimaryButton"],
+                };
+                installButton.Click += (_, _) => _model.InstallUpdate();
+                host.Children.Add(installButton);
+                break;
+            case UpdateStateKind.Installing:
+                host.Children.Add(HintText("正在替换应用，即将重启…"));
+                break;
+            case UpdateStateKind.Failed:
+                host.Children.Add(HintText(state.Message ?? "更新失败", Color.FromRgb(0xF0, 0x9E, 0x24)));
+                host.Children.Add(LinkButton("重试", (_, _) => _ = _model.CheckForUpdateAsync()));
+                break;
+        }
+        UpdateStatusHost.Content = host;
+    }
+
+    private static TextBlock HintText(string text, Color? color = null) => new()
+    {
+        Text = text,
+        FontSize = 11,
+        Foreground = new SolidColorBrush(color ?? Color.FromRgb(107, 107, 118)),
+        VerticalAlignment = VerticalAlignment.Center,
+    };
+
+    private Button LinkButton(string content, RoutedEventHandler onClick)
+    {
+        var button = new Button
+        {
+            Content = content,
+            Style = (Style)Resources["SecondaryButton"],
+            Padding = new Thickness(8, 3, 8, 3),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        button.Click += onClick;
+        return button;
+    }
+
+    private void OnAutoCheckUpdatesChanged(object sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents) return;
+        _model.Settings.AutoCheckUpdates = AutoCheckUpdatesBox.IsChecked == true;
     }
 
     // MARK: - 事件

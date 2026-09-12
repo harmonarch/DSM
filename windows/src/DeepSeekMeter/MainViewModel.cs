@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Threading;
 using DeepSeekMeter.Core;
 
@@ -33,6 +34,40 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public MainViewModel(SettingsStore settings)
     {
         Settings = settings;
+        // 更新状态变化转成 PropertyChanged，悬浮窗现有的全局 Refresh 钩子即可同步 UI
+        Update.StateChanged += () => OnPropertyChanged(nameof(UpdateState));
+    }
+
+    // MARK: - 应用内更新
+
+    /// <summary>应用内更新服务（GitHub Release 检查/下载/校验/解包，对齐 macOS UpdateService）。</summary>
+    public UpdateService Update { get; } = new();
+
+    /// <summary>更新状态快照（UI 渲染依据）。</summary>
+    public UpdateSnapshot UpdateState => Update.State;
+
+    /// <summary>检查更新；发现新版本自动下载并解包，完成后进入 ReadyToInstall。</summary>
+    public Task CheckForUpdateAsync() => Update.CheckForUpdateAsync();
+
+    /// <summary>用已下载的暂存包替换当前应用并重启（helper 在本进程退出后完成 robocopy 替换）。</summary>
+    public void InstallUpdate()
+    {
+        if (Update.StagingDirectory is not { } staging) return;
+        Update.BeginInstall();
+        try
+        {
+            UpdateInstaller.ReplaceAndRestart(staging);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                $"启动更新失败：{ex.Message}",
+                "DeepSeek Meter",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            return;
+        }
+        Application.Current.Shutdown();
     }
 
     // MARK: - 绑定属性

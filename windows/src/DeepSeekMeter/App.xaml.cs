@@ -47,6 +47,16 @@ public partial class App : System.Windows.Application
 
         _model.StartPolling();
 
+        // 启动时自动检查更新（设置可关）：错开首屏的余额/用量拉取
+        if (_settings.AutoCheckUpdates)
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                await Task.Delay(8000);
+                _model?.Update.CheckForUpdate();
+            });
+        }
+
         // 启动即弹出悬浮窗（默认置顶），避免藏在托盘后台找不到
         Dispatcher.BeginInvoke(async () =>
         {

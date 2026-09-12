@@ -196,14 +196,17 @@ try
 {
     var store = new SettingsStore(tmpFile);
     Check(store.TrySetPlatformCredentials("test-token", "test@example.com", out _), "原子设置凭据成功");
+    Check(store.AutoCheckUpdates, "自动检查更新默认开启");
     store.RefreshInterval = 300;
     store.LaunchAtLogin = true;
+    store.AutoCheckUpdates = false;
 
     var reloaded = new SettingsStore(tmpFile);
     Check(reloaded.PlatformToken == "test-token", "设置往返：Token");
     Check(reloaded.PlatformUserName == "test@example.com", "设置往返：用户名");
     Check(Math.Abs(reloaded.RefreshInterval - 300) < 0.001, "设置往返：刷新间隔");
     Check(reloaded.LaunchAtLogin, "设置往返：开机自启");
+    Check(!reloaded.AutoCheckUpdates, "设置往返：自动检查更新关闭");
 
     Check(reloaded.TryClearPlatformCredentials(out _), "原子清除凭据成功");
     Check(reloaded.PlatformToken == "" && reloaded.PlatformUserName == "", "清除 Token");
@@ -524,6 +527,18 @@ var runwayHalf = Runway.Evaluate(1.5, runwayUsage, runwayNow85);
 Check(runwayHalf.Label == "预计可用不足 1 天" && runwayHalf.Level == RunwayLevel.Warning, "不足 1 天：警示态");
 var runwayFloor = Runway.Evaluate(89.9, runwayUsage, runwayNow85);
 Check(runwayFloor.Label == "预计可用 29 天" && runwayFloor.Level == RunwayLevel.Healthy, "天数向下取整（29.96…→29）");
+
+// 20. 版本号比较（应用内更新判断：GitHub tag 与本地版本比较，对齐 Swift isVersion）
+Check(Formatting.IsVersion("0.0.6", "0.0.5"), "patch 位更新判定为更新");
+Check(Formatting.IsVersion("v0.1.0", "0.0.9"), "v 前缀剥离 + minor 位更新");
+Check(Formatting.IsVersion("V1.2.0", "1.1.99"), "大写 V 前缀剥离");
+Check(!Formatting.IsVersion("0.0.5", "0.0.5"), "相同版本不算更新");
+Check(!Formatting.IsVersion("0.0.4", "0.0.5"), "旧版本不算更新");
+Check(!Formatting.IsVersion("1.0", "1.0.0"), "段数不齐按 0 补齐后相等");
+Check(Formatting.IsVersion("1.0.1", "1.0"), "缺段按 0 补齐可比较");
+Check(Formatting.IsVersion("10.0", "9.9"), "按数值而非字符串比较（10 > 9）");
+Check(!Formatting.IsVersion("abc", "0.0.1"), "非法版本按 0 处理不算更新");
+Check(!Formatting.IsVersion(null, "0"), "null 版本按 0 处理");
 
 if (failures > 0)
 {
