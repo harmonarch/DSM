@@ -2,8 +2,6 @@
 
 DeepSeekMeter 的 Windows 版本是一个轻量的**系统托盘 App**，用于查看 DeepSeek 账户余额、消费和 Token 用量。它与 [macOS 版](../README.md)、[iOS 源码版](../ios/README.zh-CN.md)、[Android 版](../android/README.zh-CN.md)使用同一套平台接口契约。
 
-最新 Windows 产物位于 [v0.1.1 Release](https://github.com/harmonarch/DSM/releases/tag/v0.1.1)：DSM-win-x64.zip。
-
 ## 功能
 
 - **托盘余额**：托盘图标反映余额状态（正常绿色、低于 10 橙色、低于 1 红色、错误状态红色）；悬停显示余额和最后更新时间
@@ -23,15 +21,6 @@ DeepSeekMeter 的 Windows 版本是一个轻量的**系统托盘 App**，用于�
 - 源码构建需要 [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## 安装与启动
-
-### 从 Release 下载
-
-1. 在 [Releases 页面](https://github.com/harmonarch/DSM/releases)下载 DSM-win-x64.zip。
-2. 解压到当前用户可写入 WebView2 数据的目录。
-3. 运行 DeepSeekMeter.exe，无需安装程序或 .NET SDK。
-4. 点击托盘图标，选择「登录」，在 platform.deepseek.com 官方页面完成登录。
-
-Release 可执行文件是自包含版本，但不是安装程序，也不是商业发布者签名版本。不要把来自不可信来源的 ZIP 或解压目录放入敏感目录。
 
 ### 从源码构建
 

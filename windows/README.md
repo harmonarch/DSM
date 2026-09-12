@@ -2,8 +2,6 @@
 
 The Windows version of DeepSeekMeter is a lightweight **system-tray app** for viewing your DeepSeek balance, spending and token usage. It follows the same platform API contract as the [macOS app](../README.en.md), [iOS source build](../ios/README.md) and [Android app](../android/README.md).
 
-The latest Windows artifact is available in the [v0.1.1 Release](https://github.com/harmonarch/DSM/releases/tag/v0.1.1) as DSM-win-x64.zip.
-
 ## Features
 
 - **Tray balance**: the tray icon reflects the balance state (green normally, orange below 10, red below 1, and an error state in red); hovering shows the balance and last update time
@@ -23,15 +21,6 @@ The latest Windows artifact is available in the [v0.1.1 Release](https://github.
 - Source builds need the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 
 ## Install and start
-
-### From the Release
-
-1. Download DSM-win-x64.zip from the [Releases page](https://github.com/harmonarch/DSM/releases).
-2. Extract it to a directory where the current user can write WebView2 data.
-3. Run DeepSeekMeter.exe. No installer or .NET SDK is required.
-4. Click the tray icon, choose **Log in**, and sign in on platform.deepseek.com.
-
-The release executable is self-contained but is not an installer and is not code-signed by a commercial publisher. Keep the ZIP and extracted directory from untrusted sources out of sensitive locations.
 
 ### From source
 

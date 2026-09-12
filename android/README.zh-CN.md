@@ -2,8 +2,6 @@
 
 DeepSeekMeter 的 Android 版用于随时查看 DeepSeek 账户余额、消费和 Token 用量。它与 [macOS 版](../README.md)、[Windows 版](../windows/README.zh-CN.md)、[iOS 源码版](../ios/README.zh-CN.md)功能对齐，使用同一套平台接口契约。
 
-当前版本为 **[v0.0.3](https://github.com/harmonarch/DSM/releases/tag/v0.0.3)**。Release 页面提供可直装 APK：DSM-v0.0.3-android.apk。
-
 > **当前状态：** A1 骨架 ✅ / A2 核心 + JVM 单测 ✅ / A3 Compose App ✅ / **A4 打磨 ✅**（生命周期前台轮询、WorkManager 后台刷新、余额低阈值通知、Android 13+ 权限 UX、WebView popup、PR CI App 构建、维护者记录的真机 QA 矩阵）。A5 小组件和商店分发规划中。完整规划与 D6 WorkManager 决策见 [MOBILE-PLAN.md](../MOBILE-PLAN.md) 第 4 节。
 
 构建元数据：versionName 0.3.1、versionCode 2、minSdk 26、targetSdk/compileSdk 35。Android 版本号与 iOS 工程版本独立维护。
@@ -25,13 +23,6 @@ DeepSeekMeter 的 Android 版用于随时查看 DeepSeek 账户余额、消费�
 - Android 8.0 / API 26+
 - 源码构建需要 JDK 17 和 Android SDK platform 35
 - 仓库提交了 Gradle wrapper，会自动下载 Gradle 8.14.2，不需要单独安装 Gradle
-
-### 安装最新 APK
-
-1. 在 [v0.0.3 Release](https://github.com/harmonarch/DSM/releases/tag/v0.0.3) 下载 DSM-v0.0.3-android.apk。
-2. 以侧载 APK 方式安装；Android 可能要求允许文件管理器或浏览器安装未知来源应用。
-3. APK 使用 Gradle debug key 签名，便于可重复直装；它不是 Google Play 或发布者身份认证版本。
-4. 打开 App；需要余额提醒时允许通知权限，然后选择「登录」。
 
 ### 从源码构建并安装
 
