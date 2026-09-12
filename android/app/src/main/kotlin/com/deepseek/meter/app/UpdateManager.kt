@@ -1,6 +1,7 @@
 // 应用内更新：GitHub Release 检查 → 自动下载 → SHA256 校验 → PackageInstaller 覆盖安装。
-// 对齐 macOS UpdateService.swift / Windows UpdateService.cs；网络仅 GET api.github.com 与
-// Release 资源，不上报任何本地数据。安装走平台 PackageInstaller 会话（零第三方依赖），
+// 对齐 macOS UpdateService.swift / Windows UpdateService.cs；网络仅 GET api.github.com
+// （限流 403/429 时兜底走 github.com 网页端 302）与 Release 资源，不上报任何本地数据。
+// 安装走平台 PackageInstaller 会话（零第三方依赖），
 // 同签名 APK（固定正式签名，见 docs/release-signing.md）覆盖安装后数据保留。
 package com.deepseek.meter.app
 
@@ -94,7 +95,21 @@ class UpdateManager(private val context: Context) {
         }.start()
     }
 
+    /** 非 2xx 响应（携带状态码，供限流兜底判定） */
+    private class HttpCodeException(val code: Int) : RuntimeException("HTTP $code")
+
+    /** 拉取最新 Release：优先走 API；被限流（403/429，未认证限额 60 次/小时/IP，共享代理出口易耗尽）时走网页端 302 兜底 */
     private fun fetchLatestRelease(): UpdateRelease {
+        try {
+            return fetchViaApi()
+        } catch (e: HttpCodeException) {
+            if (e.code != 403 && e.code != 429) throw e
+            return fetchViaRedirect()
+        }
+    }
+
+    /** 走 api.github.com 拉取（带资产列表，首选） */
+    private fun fetchViaApi(): UpdateRelease {
         val connection = (URL("https://api.github.com/repos/${UpdateChecker.REPO_SLUG}/releases/latest")
             .openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
@@ -105,9 +120,30 @@ class UpdateManager(private val context: Context) {
         }
         try {
             val code = connection.responseCode
-            if (code != 200) throw RuntimeException("HTTP $code")
+            if (code != 200) throw HttpCodeException(code)
             val body = connection.inputStream.bufferedReader().use { it.readText() }
             return UpdateChecker.parseLatestRelease(body)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /** 网页端兜底：github.com/<repo>/releases/latest 恒 302 到 /releases/tag/<tag>，不占 API 限额 */
+    private fun fetchViaRedirect(): UpdateRelease {
+        val connection = (URL("https://github.com/${UpdateChecker.REPO_SLUG}/releases/latest")
+            .openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 15_000
+            readTimeout = 15_000
+            instanceFollowRedirects = false
+            setRequestProperty("User-Agent", "DeepSeekMeter")
+        }
+        try {
+            val code = connection.responseCode
+            if (code !in 300..399) throw RuntimeException("更新源未返回最新版本（HTTP $code）")
+            val tag = UpdateChecker.parseRedirectTag(connection.getHeaderField("Location") ?: "")
+                ?: throw RuntimeException("更新源未返回最新版本（HTTP $code）")
+            return UpdateChecker.releaseFromTag(tag)
         } finally {
             connection.disconnect()
         }

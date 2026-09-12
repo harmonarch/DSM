@@ -1,6 +1,7 @@
 package com.deepseek.meter.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -84,5 +85,42 @@ class UpdateCheckerTest {
         """.trimIndent()
         val release = UpdateChecker.parseLatestRelease(json)
         assertEquals(null, release.sumsUrl)
+    }
+
+    // MARK: - 网页端 302 兜底（API 限流 403/429 时走 github.com 网页端）
+
+    @Test
+    fun `302 绝对路径解析 tag`() =
+        assertEquals("v0.1.0", UpdateChecker.parseRedirectTag("/harmonarch/DSM/releases/tag/v0.1.0"))
+
+    @Test
+    fun `302 完整 URL 解析 tag`() = assertEquals(
+        "v1.2.3",
+        UpdateChecker.parseRedirectTag("https://github.com/harmonarch/DSM/releases/tag/v1.2.3"),
+    )
+
+    @Test
+    fun `302 剥离 query 参数`() =
+        assertEquals("v0.1.0", UpdateChecker.parseRedirectTag("/harmonarch/DSM/releases/tag/v0.1.0?x=1"))
+
+    @Test
+    fun `无 tag 段返回 null`() = assertNull(UpdateChecker.parseRedirectTag("/harmonarch/DSM/releases/latest"))
+
+    @Test
+    fun `空串返回 null`() = assertNull(UpdateChecker.parseRedirectTag(""))
+
+    @Test
+    fun `按 tag 推导安卓资产命名`() {
+        val release = UpdateChecker.releaseFromTag("v0.1.0")
+        assertEquals("0.1.0", release.version)
+        assertEquals("DSM-v0.1.0-android.apk", release.apkName)
+        assertEquals(
+            "https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-v0.1.0-android.apk",
+            release.apkUrl,
+        )
+        assertEquals(
+            "https://github.com/harmonarch/DSM/releases/download/v0.1.0/SHA256SUMS.txt",
+            release.sumsUrl,
+        )
     }
 }
