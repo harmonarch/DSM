@@ -440,58 +440,52 @@ struct PopoverView: View {
                 Spacer(minLength: 0)
             }
 
-            // 开机自启
+            // 开机自启：开关右对齐
             HStack(spacing: 8) {
                 Text("开机自启")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .frame(width: 58, alignment: .leading)
-                Toggle("", isOn: launchAtLoginBinding)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                Spacer()
+                Spacer(minLength: 0)
                 if model.isFetching {
                     ProgressView()
                         .controlSize(.small)
                 }
+                Toggle("", isOn: launchAtLoginBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
             }
 
-            // 软件更新（GitHub Release 检查 / 下载 / 覆盖安装）
+            // 检查更新（GitHub Release 检查 / 下载 / 覆盖安装）：左版本号，右按钮与状态
             updateRow
         }
     }
 
-    /// 更新行：状态区 + 自动检查开关
+    /// 更新行：左边当前版本号，右边检查更新按钮 / 下载进度 / 重启提示
     private var updateRow: some View {
         HStack(spacing: 8) {
-            Text("软件更新")
+            Text(versionText)
                 .font(.caption)
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
-                .frame(width: 58, alignment: .leading)
-            updateStatusControl
             Spacer(minLength: 0)
-            if !model.update.isDevBuild {
-                Toggle("", isOn: autoCheckBinding)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .controlSize(.small)
-                    .help("启动时自动检查 GitHub 新版本（仅读取，不上传任何数据）")
-            }
+            updateStatusControl
         }
+    }
+
+    /// 当前版本号（swift run 等非 .app 环境没有版本信息）
+    private var versionText: String {
+        UpdateService.currentVersion.map { "v\($0)" } ?? "开发构建"
     }
 
     @ViewBuilder
     private var updateStatusControl: some View {
         switch model.update.state {
         case .idle:
-            if model.update.isDevBuild {
-                Text("开发构建")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            } else {
+            if !model.update.isDevBuild {
                 Button("检查更新") { model.update.checkForUpdates() }
-                    .buttonStyle(.link)
+                    .buttonStyle(.bordered)
                     .controlSize(.small)
             }
         case .checking:
@@ -503,25 +497,28 @@ struct PopoverView: View {
                     .foregroundStyle(.tertiary)
             }
         case .upToDate:
-            Text("已是最新 ✓")
+            Text("暂无更新✅")
                 .font(.caption)
                 .foregroundStyle(.green)
         case .downloading(let progress):
-            VStack(alignment: .leading, spacing: 3) {
-                Text("正在下载 v\(model.update.pendingVersion ?? "")…")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
+            // 下载进度替代检查更新按钮的原位展示
+            HStack(spacing: 6) {
                 ProgressView(value: progress)
                     .progressViewStyle(.linear)
-                    .frame(width: 150)
+                    .frame(width: 130)
+                Text("\(Int(progress * 100))%")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(.tertiary)
+                    .frame(width: 32, alignment: .trailing)
             }
+            .help("正在下载 v\(model.update.pendingVersion ?? "")")
         case .readyToInstall:
-            Button("重启更新到 v\(model.update.pendingVersion ?? "")") {
+            Button("重启生效") {
                 model.update.installDownloadedUpdate()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
-            .help("重启并覆盖安装新版本（余额、设置自动保留）")
+            .help("新版本 v\(model.update.pendingVersion ?? "") 已下载完成，重启后覆盖安装（余额、设置自动保留）")
         case .installing:
             HStack(spacing: 6) {
                 ProgressView()
@@ -558,13 +555,6 @@ struct PopoverView: View {
         )
     }
 
-    private var autoCheckBinding: Binding<Bool> {
-        Binding(
-            get: { model.settings.autoCheckUpdates },
-            set: { model.settings.autoCheckUpdates = $0 }
-        )
-    }
-
     private static func intervalLabel(_ interval: TimeInterval) -> String {
         switch interval {
         case 15: return "15秒"
@@ -589,20 +579,14 @@ struct PopoverView: View {
             .controlSize(.small)
             .disabled(model.isFetching)
 
-            if let version = UpdateService.currentVersion {
-                Text("v\(version)")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-
-            Spacer()
-
             if !model.settings.platformToken.isEmpty {
                 Button("退出登录") { model.clearPlatformToken() }
                     .buttonStyle(.plain)
                     .controlSize(.small)
                     .foregroundStyle(.secondary)
             }
+
+            Spacer()
 
             Button("退出") { NSApp.terminate(nil) }
                 .buttonStyle(.bordered)
