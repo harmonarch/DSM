@@ -10,7 +10,7 @@
 
 - 仓库：https://github.com/pppolf/DeepSeekMeter
 - 默认分支：`main`
-- 用户文档：[README.zh-CN.md](README.zh-CN.md) / [README.md](README.md)
+- 用户文档：[README.md](README.md)（中文，默认）/ [README.en.md](README.en.md)（英文）
 
 ## 开发环境
 
@@ -91,7 +91,7 @@ Conventional Commits + 中文描述：
 5. **不改数据流向**——数据只来自 DeepSeek 官方接口，不上报任何第三方
 6. **不引入 Xcode 工程 / XCTest**——测试保持 swiftc 轻量自测；需要更重的测试设施先开 Issue
 7. **保持平台约束**——macOS 14+、Swift 5 语言模式
-8. **保持语言基调**——中文注释 / UI 文案；文档遵循双语惯例（README.md 英文 + README.zh-CN.md 中文）
+8. **保持语言基调**——中文注释 / UI 文案；文档遵循双语惯例（README.md 中文默认 + README.en.md 英文）
 
 ## 发布流程（维护者）
 

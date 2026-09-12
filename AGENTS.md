@@ -13,7 +13,7 @@ DeepSeekMeter 是一个 **macOS 菜单栏小工具**（SwiftUI + AppKit）：实
 - 构建：Swift Package Manager，**无 Xcode 工程、无任何第三方依赖、单 target**（仅指 macOS 包；iOS 工程在 `ios/` 内，见第 8 节红线 13）
 - 测试：轻量自测（swiftc 直接编译运行，**不依赖 XCTest**）
 - CI：GitHub Actions（push main / PR 触发，覆盖 macOS / Windows / iOS / Android）；发布：打 `v*` 标签自动出 macOS DMG、Windows ZIP 和 Android APK Release
-- 用户文档：README.md（英文）+ README.zh-CN.md（中文），双语惯例
+- 用户文档：README.md（中文，默认）+ README.en.md（英文），双语惯例
 
 ## 2. 常用命令（改动后必须本地验证）
 
@@ -144,7 +144,7 @@ Foundation / AppKit / SwiftUI / WebKit
 5. **不改数据流向**。所有数据只能来自 DeepSeek 官方接口，不得上报任何第三方；隐私承诺见 README「隐私与数据」
 6. **不引入 Xcode 工程或 XCTest**（**仅限 macOS 包**；iOS 工程只在 `ios/` 内，且必须通过 Scripts/check-ios-project.py 结构校验，见移动端红线 13）。测试保持 swiftc 轻量自测（Scripts/selftest/main.swift）；需要更重的测试设施先开 Issue
 7. **不破坏平台与语言模式约束**：macOS 14+、Swift 5 语言模式（Package.swift）
-8. **不改语言基调**：代码注释、UI 文案用中文；文档遵循 README.md（EN）+ README.zh-CN.md（ZH）双语惯例
+8. **不改语言基调**：代码注释、UI 文案用中文；文档遵循 README.md（中文，默认）+ README.en.md（英文）双语惯例
 9. **不破坏 CI**。合入前本地跑完整验证链；CI 红了先修复再继续
 10. **不提交产物与本地文件**：`.build/`、`build/`、`.DS_Store`、`*.xcuserstate`
 

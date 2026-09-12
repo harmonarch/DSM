@@ -1,6 +1,6 @@
-# DeepSeekMeter · iOS 🐳
+# DeepSeekMeter · iOS <img src="../images/icon.jpg" width="32" align="absmiddle" alt="DSM">
 
-The iOS implementation of DeepSeekMeter lets you view your DeepSeek balance, spending and token usage on an iPhone. It shares the same platform API contract as the [macOS app](../README.md), [Windows app](../windows/README.md) and [Android app](../android/README.md).
+The iOS implementation of DeepSeekMeter lets you view your DeepSeek balance, spending and token usage on an iPhone. It shares the same platform API contract as the [macOS app](../README.en.md), [Windows app](../windows/README.md) and [Android app](../android/README.md).
 
 > **Status:** M1 skeleton ✅ / M2 shared core + self-tests ✅ (82 assertions) / M3 app ✅ / M4 polish ✅ / M5 notifications + WidgetKit widget ✅. The repository records simulator build/run verification with Xcode 26.6 and iOS 26.5, plus free-signed device installation/run. TestFlight and App Store distribution still require an Apple Developer Program account. See [MOBILE-PLAN.md](../MOBILE-PLAN.md) for milestones, decisions and boundary rules.
 

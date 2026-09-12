@@ -1,6 +1,6 @@
-# DeepSeekMeter · iOS 版 🐳
+# DeepSeekMeter · iOS 版 <img src="../images/icon.jpg" width="32" align="absmiddle" alt="DSM">
 
-DeepSeekMeter 的 iOS 实现用于在 iPhone 上查看 DeepSeek 余额、消费和 Token 用量。它与 [macOS 版](../README.zh-CN.md)、[Windows 版](../windows/README.zh-CN.md)、[Android 版](../android/README.zh-CN.md)使用同一套平台接口契约。
+DeepSeekMeter 的 iOS 实现用于在 iPhone 上查看 DeepSeek 余额、消费和 Token 用量。它与 [macOS 版](../README.md)、[Windows 版](../windows/README.zh-CN.md)、[Android 版](../android/README.zh-CN.md)使用同一套平台接口契约。
 
 > **当前状态：** M1 骨架 ✅ / M2 共享核心 + 自测 ✅（82 项断言）/ M3 App ✅ / M4 打磨 ✅ / M5 通知 + WidgetKit 小组件 ✅。仓库记录了 Xcode 26.6、iOS 26.5 模拟器构建运行验证，以及免费签名真机安装运行验证。TestFlight 和 App Store 分发仍需要 Apple Developer Program 账号。里程碑、决策和边界规则见 [MOBILE-PLAN.md](../MOBILE-PLAN.md)。
 

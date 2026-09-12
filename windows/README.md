@@ -1,6 +1,6 @@
-# DeepSeekMeter · Windows 🐳
+# DeepSeekMeter · Windows <img src="../images/icon.jpg" width="32" align="absmiddle" alt="DSM">
 
-The Windows version of DeepSeekMeter is a lightweight **system-tray app** for viewing your DeepSeek balance, spending and token usage. It follows the same platform API contract as the [macOS app](../README.md), [iOS source build](../ios/README.md) and [Android app](../android/README.md).
+The Windows version of DeepSeekMeter is a lightweight **system-tray app** for viewing your DeepSeek balance, spending and token usage. It follows the same platform API contract as the [macOS app](../README.en.md), [iOS source build](../ios/README.md) and [Android app](../android/README.md).
 
 The latest Windows artifact is available in the [v0.3.1 Release](https://github.com/pppolf/DeepSeekMeter/releases/tag/v0.3.1) as DeepSeekMeter-win-x64.zip.
 

@@ -1,6 +1,6 @@
-# DeepSeekMeter · Android 🐳
+# DeepSeekMeter · Android <img src="../images/icon.jpg" width="32" align="absmiddle" alt="DSM">
 
-The Android version of DeepSeekMeter lets you check your DeepSeek balance, spending and token usage on the go. It is feature-aligned with the [macOS app](../README.md), [Windows app](../windows/README.md) and [iOS source build](../ios/README.md), using the same platform API contract.
+The Android version of DeepSeekMeter lets you check your DeepSeek balance, spending and token usage on the go. It is feature-aligned with the [macOS app](../README.en.md), [Windows app](../windows/README.md) and [iOS source build](../ios/README.md), using the same platform API contract.
 
 The current release is **[v0.3.1](https://github.com/pppolf/DeepSeekMeter/releases/tag/v0.3.1)**. The Release page contains a direct-install APK named DeepSeekMeter-v0.3.1-android.apk.
 

@@ -10,7 +10,7 @@ Thanks for your interest in contributing! 🐳
 
 - Repo: https://github.com/pppolf/DeepSeekMeter
 - Default branch: `main`
-- User docs: [README.md](README.md) / [README.zh-CN.md](README.zh-CN.md)
+- User docs: [README.md](README.md) (Chinese, default) / [README.en.md](README.en.md) (English)
 
 ## Development Setup
 
@@ -93,7 +93,7 @@ Keep the project inside these lines — they are privacy and stability commitmen
 5. **No data flow changes** — data comes only from DeepSeek's official endpoints; nothing is sent to third parties
 6. **No Xcode project / XCTest** — keep tests as lightweight swiftc self-tests; open an issue for heavier test tooling
 7. **Keep platform constraints** — macOS 14+, Swift 5 language mode
-8. **Keep the language baseline** — Chinese comments/UI; bilingual docs (README.md EN + README.zh-CN.md ZH)
+8. **Keep the language baseline** — Chinese comments/UI; bilingual docs (README.md Chinese default + README.en.md English)
 
 ## Release Process (maintainers)
 
