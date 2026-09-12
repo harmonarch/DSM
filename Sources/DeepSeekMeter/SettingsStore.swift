@@ -26,6 +26,12 @@ final class SettingsStore: ObservableObject {
             applyLaunchAtLogin(launchAtLogin)
         }
     }
+    /// 启动时自动检查 GitHub Release 新版本（仅 GET 读取，不上报任何本地数据）
+    @Published var autoCheckUpdates: Bool {
+        didSet {
+            UserDefaults.standard.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates)
+        }
+    }
 
     /// 可选的刷新间隔（秒）
     static let intervalOptions: [TimeInterval] = [15, 30, 60, 300, 600]
@@ -35,6 +41,7 @@ final class SettingsStore: ObservableObject {
         static let platformUserName = "settings.platformUserName"
         static let refreshInterval = "settings.refreshInterval"
         static let launchAtLogin = "settings.launchAtLogin"
+        static let autoCheckUpdates = "settings.autoCheckUpdates"
     }
 
     init() {
@@ -46,6 +53,8 @@ final class SettingsStore: ObservableObject {
         // 刷新间隔只接受项目已有合法选项，损坏/非法值回退 1 分钟
         refreshInterval = Self.intervalOptions.contains(saved) ? saved : 60
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
+        // 未设置过时默认开启自动检查更新（只读 GitHub Release 元信息，README 隐私章节有披露）
+        autoCheckUpdates = defaults.object(forKey: Keys.autoCheckUpdates) as? Bool ?? true
 
         // 一次性迁移：旧版本把 Token 存在钥匙串（ad-hoc 签名导致每次启动都要密码授权）
         // 迁到 UserDefaults 后删除钥匙串条目，此后不再访问钥匙串

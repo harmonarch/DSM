@@ -456,6 +456,91 @@ struct PopoverView: View {
                         .controlSize(.small)
                 }
             }
+
+            // 软件更新（GitHub Release 检查 / 下载 / 覆盖安装）
+            updateRow
+        }
+    }
+
+    /// 更新行：状态区 + 自动检查开关
+    private var updateRow: some View {
+        HStack(spacing: 8) {
+            Text("软件更新")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 58, alignment: .leading)
+            updateStatusControl
+            Spacer(minLength: 0)
+            if !model.update.isDevBuild {
+                Toggle("", isOn: autoCheckBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .help("启动时自动检查 GitHub 新版本（仅读取，不上传任何数据）")
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var updateStatusControl: some View {
+        switch model.update.state {
+        case .idle:
+            if model.update.isDevBuild {
+                Text("开发构建")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            } else {
+                Button("检查更新") { model.update.checkForUpdates() }
+                    .buttonStyle(.link)
+                    .controlSize(.small)
+            }
+        case .checking:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("检查中…")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        case .upToDate:
+            Text("已是最新 ✓")
+                .font(.caption)
+                .foregroundStyle(.green)
+        case .downloading(let progress):
+            VStack(alignment: .leading, spacing: 3) {
+                Text("正在下载 v\(model.update.pendingVersion ?? "")…")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .frame(width: 150)
+            }
+        case .readyToInstall:
+            Button("重启更新到 v\(model.update.pendingVersion ?? "")") {
+                model.update.installDownloadedUpdate()
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("重启并覆盖安装新版本（余额、设置自动保留）")
+        case .installing:
+            HStack(spacing: 6) {
+                ProgressView()
+                    .controlSize(.small)
+                Text("正在替换应用…")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+        case .failed(let message):
+            HStack(spacing: 6) {
+                Text(message)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button("重试") { model.update.checkForUpdates() }
+                    .buttonStyle(.link)
+                    .controlSize(.small)
+            }
         }
     }
 
@@ -470,6 +555,13 @@ struct PopoverView: View {
         Binding(
             get: { model.settings.launchAtLogin },
             set: { model.settings.launchAtLogin = $0 }
+        )
+    }
+
+    private var autoCheckBinding: Binding<Bool> {
+        Binding(
+            get: { model.settings.autoCheckUpdates },
+            set: { model.settings.autoCheckUpdates = $0 }
         )
     }
 
@@ -496,6 +588,12 @@ struct PopoverView: View {
             .buttonStyle(.bordered)
             .controlSize(.small)
             .disabled(model.isFetching)
+
+            if let version = UpdateService.currentVersion {
+                Text("v\(version)")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
 
             Spacer()
 

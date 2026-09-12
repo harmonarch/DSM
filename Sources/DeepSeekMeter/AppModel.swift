@@ -5,6 +5,8 @@ import Combine
 @MainActor
 final class AppModel: ObservableObject {
     let settings: SettingsStore
+    /// 应用内更新（GitHub Release 检查/下载/覆盖安装），独立于平台接口的网络入口
+    let update: UpdateService
 
     @Published var lastBalance: BalanceInfo?
     @Published var lastUpdate: Date?
@@ -34,6 +36,7 @@ final class AppModel: ObservableObject {
 
     init(settings: SettingsStore) {
         self.settings = settings
+        self.update = UpdateService()
     }
 
     // MARK: - 轮询
