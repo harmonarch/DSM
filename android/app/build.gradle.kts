@@ -24,12 +24,28 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // 固定正式签名（可选用）：CI 在 release.yml 里把 Secret 中的 keystore 解码到临时目录，
+    // 通过 DSM_RELEASE_* 环境变量注入。跨版本签名一致后，应用内下载 APK 才能直接覆盖安装
+    //（签名不一致会被系统拒绝，用户只能卸载重装）。密钥本体不入仓库（红线 3），
+    // 本机配置方法见 docs/release-signing.md；未注入环境变量时回退 debug 签名，
+    // 保持无密钥环境可构建（签名仅保证可安装，不构成信任背书）。
+    signingConfigs {
+        val storeFilePath = System.getenv("DSM_RELEASE_STORE_FILE")
+        if (storeFilePath != null) {
+            create("dsmRelease") {
+                storeFile = file(storeFilePath)
+                storePassword = System.getenv("DSM_RELEASE_STORE_PASSWORD")
+                keyAlias = System.getenv("DSM_RELEASE_KEY_ALIAS")
+                keyPassword = System.getenv("DSM_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // GitHub Release 直装 APK 用 debug 签名（与 macOS 版 ad-hoc 签名理念一致）：
-            // 任何人均可构建/重签，签名仅保证可安装，不构成信任背书。
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("dsmRelease")
+                ?: signingConfigs.getByName("debug")
         }
     }
 

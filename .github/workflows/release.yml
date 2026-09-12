@@ -86,6 +86,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Restore release keystore（固定签名，跨版本覆盖安装的前提）
+        env:
+          DSM_KEYSTORE_BASE64: ${{ secrets.DSM_KEYSTORE_BASE64 }}
+          DSM_RELEASE_STORE_PASSWORD: ${{ secrets.DSM_RELEASE_STORE_PASSWORD }}
+        run: |
+          if [ -n "$DSM_KEYSTORE_BASE64" ]; then
+            KS="$RUNNER_TEMP/dsm-release.keystore"
+            echo "$DSM_KEYSTORE_BASE64" | base64 --decode > "$KS"
+            {
+              echo "DSM_RELEASE_STORE_FILE=$KS"
+              echo "DSM_RELEASE_STORE_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
+              echo "DSM_RELEASE_KEY_ALIAS=dsm"
+              echo "DSM_RELEASE_KEY_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "已从 Secret 恢复固定签名密钥（alias=dsm）"
+          else
+            echo "未配置 DSM_KEYSTORE_BASE64 Secret，本次 APK 回退 debug 签名（应用内更新将无法覆盖安装）"
+          fi
+
       - name: Build release APK
         run: |
           chmod +x android/gradlew
