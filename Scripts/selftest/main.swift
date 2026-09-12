@@ -267,6 +267,54 @@ let utcMonMorning = Calendar(identifier: .gregorian)
     .date(from: DateComponents(timeZone: TimeZone(identifier: "UTC"), year: 2026, month: 9, day: 14, hour: 1, minute: 30))!
 check(tariffPeriod(on: utcMonMorning) == .peak, "UTC 周一 01:30（北京周一 09:30）为高峰")
 
+// 12. 续航读数（油表语义：余额 ÷ 近 7 日日均费用，满格 = 30 天；与 Android 端 GaugeHero 同口径）
+func runwayBjDate(_ y: Int, _ mo: Int, _ d: Int) -> Date {
+    MonthUsage.platformCalendar.date(from: DateComponents(year: y, month: mo, day: d, hour: 12))!
+}
+func runwayCostDay(_ date: String, _ cost: Double) -> UsageDay {
+    UsageDay(date: date, data: [ModelUsage(model: "deepseek-chat", usage: [UsageItem(type: "COST", amount: "\(cost)")])])
+}
+// 8/1–8/5 每日费用 1..5：验证窗口收缩（月初）、封顶 7 天、无用量日按 0 计
+let runwayUsage = MonthUsage(
+    year: 2026, month: 8, amountModels: [], costModels: [],
+    costDays: [
+        runwayCostDay("2026-08-01", 1.0),
+        runwayCostDay("2026-08-02", 2.0),
+        runwayCostDay("2026-08-03", 3.0),
+        runwayCostDay("2026-08-04", 4.0),
+        runwayCostDay("2026-08-05", 5.0),
+    ],
+    amountDays: []
+)
+check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 1)) - 1.0) < 0.001, "日均窗口：月初第 1 天只看当天")
+check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 2)) - 1.5) < 0.001, "日均窗口：月初第 2 天为 2 天（(1+2)/2）")
+check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 5)) - 3.0) < 0.001, "日均窗口：本月已过 5 天窗口收缩为 5（15/5=3）")
+check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 8)) - 2.0) < 0.001, "日均窗口：封顶 7 天且无用量日按 0 计（14/7=2）")
+check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 20))) < 0.001, "日均窗口：窗口滑出有数据区间后为 0")
+// 四态读数（8/5 的日均 = 3 元）
+check(runwayReadout(balance: 9, usage: nil, on: runwayBjDate(2026, 8, 5)).level == .unknown, "用量未就绪：中性「预计可用 —」")
+check(runwayReadout(balance: 0, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).label == "余额已耗尽", "余额 0：耗尽判定优先于无消耗")
+check(runwayReadout(balance: 9, usage: runwayUsage, on: runwayBjDate(2026, 8, 20)).label == "近期无消耗", "近 7 日无消耗：满格中性")
+let runway10 = runwayReadout(balance: 30, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+check(runway10.label == "预计可用 10 天" && abs(runway10.ratio - 1.0 / 3.0) < 0.001 && runway10.level == .healthy, "余额 30 日均 3：预计可用 10 天（占比 1/3）")
+check(runwayReadout(balance: 90, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).label == "预计可用 30 天以上", "满 30 天封顶文案")
+check(runwayReadout(balance: 90, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).ratio == 1, "满 30 天占比封顶为 1")
+let runwayHalf = runwayReadout(balance: 1.5, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+check(runwayHalf.label == "预计可用不足 1 天" && runwayHalf.level == .warning, "不足 1 天：警示态")
+let runwayFloor = runwayReadout(balance: 89.9, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+check(runwayFloor.label == "预计可用 29 天" && runwayFloor.level == .healthy, "天数向下取整（29.96…→29）")
+
+// 13. 版本号比较（应用内更新判断：GitHub tag 与本地版本比较）
+check(isVersion("0.0.6", newerThan: "0.0.5"), "patch 位更新判定为更新")
+check(isVersion("v0.1.0", newerThan: "0.0.9"), "v 前缀剥离 + minor 位更新")
+check(isVersion("V1.2.0", newerThan: "1.1.99"), "大写 V 前缀剥离")
+check(!isVersion("0.0.5", newerThan: "0.0.5"), "相同版本不算更新")
+check(!isVersion("0.0.4", newerThan: "0.0.5"), "旧版本不算更新")
+check(!isVersion("1.0", newerThan: "1.0.0"), "段数不齐按 0 补齐后相等")
+check(isVersion("1.0.1", newerThan: "1.0"), "缺段按 0 补齐可比较")
+check(isVersion("10.0", newerThan: "9.9"), "按数值而非字符串比较（10 > 9）")
+check(!isVersion("abc", newerThan: "0.0.1"), "非法版本按 0 处理不算更新")
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)

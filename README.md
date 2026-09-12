@@ -127,6 +127,7 @@ bash Scripts/run-ios-simulator.sh
 ## 隐私与数据
 
 - 请求由 App 直接发往 DeepSeek 私有平台接口：/auth-api/v0/users/current、/api/v0/users/get_user_summary、/api/v0/usage/by_api_key/amount、/api/v0/usage/by_api_key/cost。这些不是公开 API 契约，平台聚合本身可能存在统计延迟。
+- 应用内更新会向 GitHub 发出**只读**请求（`api.github.com/repos/harmonarch/DSM/releases/latest` 与 Release 资源下载、SHA256SUMS 校验），仅用于检查和获取新版本，不上传任何本地数据；可在设置中关闭自动检查。
 - App 不会把 Token、余额、用量、遥测或分析数据发送给本项目维护者或任何其他第三方。
 - Token 按平台存储：macOS UserDefaults（路径为 ~/Library/Preferences/com.deepseek.meter.plist）、Windows DPAPI 保护的设置、iOS Keychain、Android Keystore 加密后写入 SharedPreferences 的密文。
 - iOS 小组件只从 App Group 读取非敏感余额快照；Android 后台任务不会通过 WorkManager 输入数据接收 Token。

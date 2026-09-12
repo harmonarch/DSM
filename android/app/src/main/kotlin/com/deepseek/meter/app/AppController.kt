@@ -33,6 +33,9 @@ class AppController(context: Context) {
 
     private val _state = mutableStateOf<AppModel.State?>(null)
 
+    /** 应用内更新（GitHub Release 检查/下载/PackageInstaller 覆盖安装），独立线程执行 */
+    val updateManager: UpdateManager = UpdateManager(context.applicationContext)
+
     private val appModel: AppModel = AppModel(
         platformService = PlatformService(),
         tokenStore = KeystoreTokenStore(context),
@@ -64,7 +67,15 @@ class AppController(context: Context) {
     fun startForegroundPolling() {
         if (closed || polling) return
         polling = true
+        maybeAutoCheckUpdate()
         restartPolling()
+    }
+
+    /** 启动时自动检查更新（设置可关，延迟错开首屏余额拉取）；状态非 Idle（已检查过）时跳过 */
+    private fun maybeAutoCheckUpdate() {
+        if (closed || !updateManager.autoCheck) return
+        if (updateManager.state !is UpdateState.Idle) return
+        updateManager.checkForUpdate()
     }
 
     /** 进入后台：停止前台高频轮询，保留 Executor 以便回前台快速恢复 */
@@ -84,6 +95,7 @@ class AppController(context: Context) {
         scheduledFuture?.cancel(false)
         scheduledFuture = null
         executor.shutdown()
+        updateManager.release()
     }
 
     @Synchronized

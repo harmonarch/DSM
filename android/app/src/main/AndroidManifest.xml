@@ -7,6 +7,9 @@
     <!-- Android 13+ 低余额本地通知（运行时申请，见 SettingsScreen 权限三态） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- 应用内更新：GitHub Release 下载 APK 后经 PackageInstaller 覆盖安装（用户确认制） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <application
         android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"

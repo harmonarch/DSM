@@ -196,7 +196,17 @@
                             <TextBlock x:Name="BalanceValueText" Text="—" FontSize="30" FontWeight="Bold"
                                        Foreground="#1A1A20" />
                         </StackPanel>
-                        <TextBlock x:Name="CurrencyCodeText" Text="" FontSize="10" Foreground="#9A9AA6" />
+                        <!-- 续航读数：余额 ÷ 近 7 日日均费用，满格 = 30 天（与 Android 仪表 / macOS·iOS 余量条同口径） -->
+                        <Grid Margin="0,6,0,0">
+                            <TextBlock x:Name="RunwayText" Text="预计可用 —" FontSize="11" Foreground="#9A9AA6"
+                                       VerticalAlignment="Center" />
+                            <Border Width="64" Height="4" CornerRadius="2" Background="#E6E6EC"
+                                    HorizontalAlignment="Right" VerticalAlignment="Center">
+                                <Border x:Name="RunwayFill" Width="0" CornerRadius="2" Background="#4D6BFE"
+                                        HorizontalAlignment="Left" />
+                            </Border>
+                        </Grid>
+                        <TextBlock x:Name="CurrencyCodeText" Text="" FontSize="10" Foreground="#9A9AA6" Margin="0,4,0,0" />
                     </StackPanel>
                     <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,0,0">
                         <TextBlock x:Name="GrantedText" Text="赠送 —" FontSize="11" FontWeight="Medium"
@@ -380,6 +390,21 @@
                                       FontSize="11" Foreground="#3A3A42" VerticalAlignment="Center" VerticalContentAlignment="Center"
                                       Checked="OnLaunchAtLoginChanged" Unchecked="OnLaunchAtLoginChanged" />
                         </Grid>
+
+                        <!-- 软件更新（GitHub Release 检查 / 下载 / 覆盖安装） -->
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="64" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="软件更新" FontSize="11" Foreground="#6B6B76" VerticalAlignment="Center" />
+                            <ContentControl x:Name="UpdateStatusHost" Grid.Column="1" VerticalAlignment="Center" />
+                            <CheckBox x:Name="AutoCheckUpdatesBox" Grid.Column="2" Content="自动检查" FontSize="11" Foreground="#3A3A42"
+                                      VerticalAlignment="Center" VerticalContentAlignment="Center" Margin="8,0,0,0"
+                                      ToolTip="启动时自动检查 GitHub 新版本（仅读取，不上传任何数据）"
+                                      Checked="OnAutoCheckUpdatesChanged" Unchecked="OnAutoCheckUpdatesChanged" />
+                        </Grid>
                     </StackPanel>
                 </Border>
 
@@ -389,6 +414,8 @@
                         <Button x:Name="RefreshButton" Content="刷新" Style="{StaticResource SecondaryButton}" Click="OnRefreshClick" />
                         <Button x:Name="LogoutButton" Content="退出登录" FontSize="11" Padding="8,5" Background="Transparent"
                                 BorderThickness="0" Foreground="#9A9AA6" Cursor="Hand" Click="OnLogoutClick" Margin="10,0,0,0" />
+                        <TextBlock x:Name="VersionText" Text="" FontSize="10" Foreground="#9A9AA6"
+                                   VerticalAlignment="Center" Margin="10,0,0,0" />
                     </StackPanel>
                     <Button Content="退出" Style="{StaticResource SecondaryButton}" HorizontalAlignment="Right" Click="OnQuitClick" />
                 </Grid>

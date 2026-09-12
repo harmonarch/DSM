@@ -297,6 +297,42 @@ func stubSession() -> URLSession {
     return URLSession(configuration: config)
 }
 
+// 11.5 续航读数（油表语义：余额 ÷ 近 7 日日均费用，满格 = 30 天；与 Android 端 GaugeHero / macOS 自测同口径）
+// 8/1–8/5 每日费用 1..5：1785513600 = 北京 8/1 00:00，之后每天 +86400
+let runwayCostJSON = """
+{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":1785513600,"end":1788192000,"bucket":86400,"models":["deepseek-chat"],"data":[{"currency":"CNY","series":[{"api_key":{"tracking_id":"test-tracking","name":"test-key","sensitive_id":"sk-xxx","valid":true},"model":"deepseek-chat","buckets":[{"time":1785513600,"cost":"1.0"},{"time":1785600000,"cost":"2.0"},{"time":1785686400,"cost":"3.0"},{"time":1785772800,"cost":"4.0"},{"time":1785859200,"cost":"5.0"}]}]}]}}}
+"""
+do {
+    struct RunwayBiz: Decodable { let bizData: APIKeyCostData }
+    struct RunwayResp: Decodable { let code: Int; let data: RunwayBiz? }
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let runwayCostData = try decoder.decode(RunwayResp.self, from: Data(runwayCostJSON.utf8)).data?.bizData
+    let runwayUsage = MonthUsage.aggregated(startTs: 1785513600, endTs: 1788192000, tzSeconds: 28800, amountData: nil, costData: runwayCostData)
+    func runwayBjDate(_ y: Int, _ mo: Int, _ d: Int) -> Date {
+        MonthUsage.platformCalendar.date(from: DateComponents(year: y, month: mo, day: d, hour: 12))!
+    }
+    check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 1)) - 1.0) < 0.001, "日均窗口：月初第 1 天只看当天")
+    check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 2)) - 1.5) < 0.001, "日均窗口：月初第 2 天为 2 天（(1+2)/2）")
+    check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 5)) - 3.0) < 0.001, "日均窗口：本月已过 5 天窗口收缩为 5（15/5=3）")
+    check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 8)) - 2.0) < 0.001, "日均窗口：封顶 7 天且无用量日按 0 计（14/7=2）")
+    check(abs(runwayUsage.recentDailyCost(on: runwayBjDate(2026, 8, 20))) < 0.001, "日均窗口：窗口滑出有数据区间后为 0")
+    // 四态读数（8/5 的日均 = 3 元）
+    check(runwayReadout(balance: 9, usage: nil, on: runwayBjDate(2026, 8, 5)).level == .unknown, "用量未就绪：中性「预计可用 —」")
+    check(runwayReadout(balance: 0, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).label == "余额已耗尽", "余额 0：耗尽判定优先于无消耗")
+    check(runwayReadout(balance: 9, usage: runwayUsage, on: runwayBjDate(2026, 8, 20)).label == "近期无消耗", "近 7 日无消耗：满格中性")
+    let runway10 = runwayReadout(balance: 30, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+    check(runway10.label == "预计可用 10 天" && abs(runway10.ratio - 1.0 / 3.0) < 0.001 && runway10.level == .healthy, "余额 30 日均 3：预计可用 10 天（占比 1/3）")
+    check(runwayReadout(balance: 90, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).label == "预计可用 30 天以上", "满 30 天封顶文案")
+    check(runwayReadout(balance: 90, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).ratio == 1, "满 30 天占比封顶为 1")
+    let runwayHalf = runwayReadout(balance: 1.5, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+    check(runwayHalf.label == "预计可用不足 1 天" && runwayHalf.level == .warning, "不足 1 天：警示态")
+    let runwayFloor = runwayReadout(balance: 89.9, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+    check(runwayFloor.label == "预计可用 29 天" && runwayFloor.level == .healthy, "天数向下取整（29.96…→29）")
+} catch {
+    check(false, "续航读数抛错：\(error)")
+}
+
 let currentUserOK = """
 {"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"id":"u_1","email":"dev@example.com","currency":"USD"}}}
 """
@@ -376,6 +412,17 @@ BalanceSnapshot.save(balance: 42.5, currency: "USD")
 let snap = BalanceSnapshot.load()
 check(abs(snap.balance - 42.5) < 0.001 && snap.currency == "USD", "快照写入/读取")
 check(snap.updated != nil, "快照更新时间")
+
+// 14. 版本号比较（应用内更新判断：GitHub tag 与本地版本比较，对齐 macOS 自测）
+check(isVersion("0.0.6", newerThan: "0.0.5"), "patch 位更新判定为更新")
+check(isVersion("v0.1.0", newerThan: "0.0.9"), "v 前缀剥离 + minor 位更新")
+check(isVersion("V1.2.0", newerThan: "1.1.99"), "大写 V 前缀剥离")
+check(!isVersion("0.0.5", newerThan: "0.0.5"), "相同版本不算更新")
+check(!isVersion("0.0.4", newerThan: "0.0.5"), "旧版本不算更新")
+check(!isVersion("1.0", newerThan: "1.0.0"), "段数不齐按 0 补齐后相等")
+check(isVersion("1.0.1", newerThan: "1.0"), "缺段按 0 补齐可比较")
+check(isVersion("10.0", newerThan: "9.9"), "按数值而非字符串比较（10 > 9）")
+check(!isVersion("abc", newerThan: "0.0.1"), "非法版本按 0 处理不算更新")
 
     // 12. AppModel 状态机（内存 TokenStore + URLProtocol Mock 路由 4 个接口）
     final class MemoryTokenStore: TokenStoring {

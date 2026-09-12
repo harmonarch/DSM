@@ -123,6 +123,7 @@ struct HomeView: View {
                 .monospacedDigit()
                 .contentTransition(.numericText())
                 .animation(.snappy, value: appModel.lastBalance?.total)
+            runwayLine
             HStack(spacing: 24) {
                 heroMiniStat("赠送", appModel.lastBalance?.granted)
                 heroMiniStat("充值", appModel.lastBalance?.toppedUp)
@@ -166,6 +167,23 @@ struct HomeView: View {
                 .font(.subheadline.weight(.semibold))
                 .monospacedDigit()
         }
+    }
+
+    // MARK: - 续航（余额 ÷ 近 7 日日均费用，满格 = 30 天；与 Android 端仪表同口径）
+
+    /// 续航读数行：白色读数在左、细余量条在右——对应 Android 表盘中心的「预计可用 N 天」
+    private var runwayLine: some View {
+        let readout = runwayReadout(balance: appModel.lastBalance?.total ?? 0, usage: appModel.monthUsage)
+        return HStack(spacing: 8) {
+            Text(readout.label)
+                .font(.footnote.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.92))
+            Spacer()
+            HeroRunwayBar(ratio: readout.ratio, level: readout.level)
+                .frame(width: 72)
+        }
+        .animation(.snappy, value: readout)
     }
 
     // MARK: - 本月用量
@@ -463,5 +481,32 @@ struct HomeView: View {
         case .cacheHit: return hit
         case .total: return resp + hit + miss
         }
+    }
+}
+
+/// 余额卡内的续航余量条：满格 = 30 天（与 Android 端仪表满弧同语义的平面版）。
+/// 沿用渐变卡语言：白色轨道 + 白色填充；健康度已由卡底色编码，条本身不再叠色。
+private struct HeroRunwayBar: View {
+    let ratio: Double
+    let level: RunwayLevel
+
+    var body: some View {
+        Capsule()
+            .fill(.white.opacity(0.25))
+            .frame(height: 4)
+            .overlay(alignment: .leading) {
+                if fillWidth > 0 {
+                    Capsule()
+                        .fill(.white.opacity(0.95))
+                        .frame(width: fillWidth)
+                }
+            }
+            .clipShape(Capsule())
+    }
+
+    /// 比率极小（不足 1 天）时保留 3pt 最小可见宽度，让「快见底」仍然可读
+    private var fillWidth: CGFloat {
+        guard level != .unknown, ratio > 0 else { return 0 }
+        return min(72, max(3, 72 * ratio))
     }
 }

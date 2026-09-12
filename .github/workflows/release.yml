@@ -1,6 +1,6 @@
 name: Release
 
-# 推送 v* 标签（如 v0.1.0）时自动构建并发布 GitHub Release（macOS DMG + Windows ZIP + Android APK）
+# 推送 v* 标签（如 v0.1.0）时自动构建并发布 GitHub Release（macOS DMG + ZIP 更新包 + Windows ZIP + Android APK + SHA256SUMS）
 on:
   push:
     tags: ["v*"]
@@ -29,11 +29,17 @@ jobs:
           ln -s /Applications "$STAGE/Applications"
           hdiutil create -volname "DeepSeekMeter" -srcfolder "$STAGE" -ov -format UDZO "build/DSM-${VERSION}-macOS.dmg"
 
+      - name: Package ZIP（应用内更新包；ditto 保留签名与元数据）
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent build/DeepSeekMeter.app "build/DSM-${VERSION}-macOS.zip"
+
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macOS-dmg
-          path: build/DSM-*-macOS.dmg
+          path: |
+            build/DSM-*-macOS.dmg
+            build/DSM-*-macOS.zip
 
   build-windows:
     name: Build Windows
@@ -86,6 +92,25 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Restore release keystore（固定签名，跨版本覆盖安装的前提）
+        env:
+          DSM_KEYSTORE_BASE64: ${{ secrets.DSM_KEYSTORE_BASE64 }}
+          DSM_RELEASE_STORE_PASSWORD: ${{ secrets.DSM_RELEASE_STORE_PASSWORD }}
+        run: |
+          if [ -n "$DSM_KEYSTORE_BASE64" ]; then
+            KS="$RUNNER_TEMP/dsm-release.keystore"
+            echo "$DSM_KEYSTORE_BASE64" | base64 --decode > "$KS"
+            {
+              echo "DSM_RELEASE_STORE_FILE=$KS"
+              echo "DSM_RELEASE_STORE_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
+              echo "DSM_RELEASE_KEY_ALIAS=dsm"
+              echo "DSM_RELEASE_KEY_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
+            } >> "$GITHUB_ENV"
+            echo "已从 Secret 恢复固定签名密钥（alias=dsm）"
+          else
+            echo "未配置 DSM_KEYSTORE_BASE64 Secret，本次 APK 回退 debug 签名（应用内更新将无法覆盖安装）"
+          fi
+
       - name: Build release APK
         run: |
           chmod +x android/gradlew
@@ -124,6 +149,12 @@ jobs:
 
       - name: Rename Android APK (with version)
         run: mv artifacts/app-release.apk "artifacts/DSM-$GITHUB_REF_NAME-android.apk"
+
+      - name: Generate SHA256SUMS（应用内更新下载后校验哈希用）
+        run: |
+          cd artifacts
+          sha256sum DSM-* > SHA256SUMS.txt
+          cat SHA256SUMS.txt
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -13,6 +13,7 @@ DeepSeekMeter 的 Windows 版本是一个轻量的**系统托盘 App**，用于�
 - **Token 趋势**：本月按天展示输出、缓存命中或总 Token
 - **刷新间隔**：15 秒至 10 分钟
 - **开机自启**：当前用户 Registry Run 项，无需管理员权限
+- **应用内更新**：检查 GitHub Release 新版本并自动下载（SHA256 校验），确认后由批处理 helper 在退出后镜像替换并重启；可在设置中关闭自动检查
 
 ## 环境要求
 
@@ -96,6 +97,7 @@ dotnet run --project windows/tests/DeepSeekMeter.Selftest -c Release
 ## 隐私与数据
 
 - 请求直接发往 DeepSeek 私有接口：/auth-api/v0/users/current、/api/v0/users/get_user_summary、/api/v0/usage/by_api_key/amount、/api/v0/usage/by_api_key/cost。Token 属于登录用户，App 没有遥测或第三方上报服务。
+- 应用内更新会向 GitHub 发出只读请求（releases/latest 与资源下载），仅用于检查和获取新版本，不上传任何本地数据；可在设置中关闭自动检查。
 - 登录态 Token 使用 Windows DPAPI 加密，绑定当前 Windows 用户，保存在 %APPDATA%/DeepSeekMeter/settings.json。
 - WebView2 登录数据保存在本机 %LOCALAPPDATA%/DeepSeekMeter/WebView2；成功退出登录时会清理相关数据。
 - Token 不会写入日志、截图或第三方服务。不要把真实 Token 粘贴到 Issue 或源码中。

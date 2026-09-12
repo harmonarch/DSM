@@ -50,4 +50,36 @@ public static class Formatting
 
     /// <summary>模型展示名：去掉 deepseek- 前缀。</summary>
     public static string ModelDisplayName(string model) => model.Replace("deepseek-", "");
+
+    /// <summary>
+    /// 判断版本号 a 是否严格新于 b（相等或更旧返回 false）。支持可选 v/V 前缀（GitHub tag 形如 v0.0.6）；
+    /// 按 "." 分段逐段比较数值，段数不齐按 0 补齐，非数字段按 0 处理（对齐 macOS/iOS isVersion）。
+    /// </summary>
+    public static bool IsVersion(string? a, string? b)
+    {
+        static int[] Segments(string? version)
+        {
+            if (string.IsNullOrWhiteSpace(version)) return [0];
+            var v = version.Trim();
+            if (v.StartsWith("v") || v.StartsWith("V")) v = v[1..];
+            var parts = v.Split('.');
+            var result = new int[parts.Length];
+            for (var i = 0; i < parts.Length; i++)
+            {
+                _ = int.TryParse(parts[i], out var n);
+                result[i] = n;
+            }
+            return result;
+        }
+
+        var lhs = Segments(a);
+        var rhs = Segments(b);
+        for (var i = 0; i < Math.Max(lhs.Length, rhs.Length); i++)
+        {
+            var l = i < lhs.Length ? lhs[i] : 0;
+            var r = i < rhs.Length ? rhs[i] : 0;
+            if (l != r) return l > r;
+        }
+        return false;
+    }
 }
