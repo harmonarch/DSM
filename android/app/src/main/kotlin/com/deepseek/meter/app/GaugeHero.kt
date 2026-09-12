@@ -1,7 +1,7 @@
 // 「仪表盘」Hero 卡：应用名叫 DeepSeekMeter，主角就该是一块真正的"表"。
-// 240° 刻度表盘：指针弧 = 本月消耗占比（本月已用 ÷ (本月已用 + 余额)），
-// 表盘中心保留用户最关心的余额大数字；金色铆钉标记指针端点，
-// 鲸鱼娘吉祥物从卡片右下角探出身子——品牌记忆点。
+// 240° 刻度表盘：指针弧 = 续航余量——余额按近 7 日日均消耗预计还能用的天数，满弧 = 30 天。
+// 油表回答的是"还能开多远"而不是"烧掉了百分之几"；中心叠余额大数字 + "预计可用 N 天"读数，
+// 金色铆钉标记指针端点，鲸鱼娘吉祥物从卡片右下角探出身子——品牌记忆点。
 package com.deepseek.meter.app
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,9 +38,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.deepseek.meter.core.AppModel
+import com.deepseek.meter.core.MonthUsage
 import com.deepseek.meter.core.currencySymbol
 import com.deepseek.meter.core.format
+import java.util.Calendar
+import java.util.TimeZone
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 
 /// 表盘几何常量（固定尺寸；中心叠字的对齐偏移依赖这些值）
@@ -52,7 +56,6 @@ private const val ARC_SWEEP = 240f
 @Composable
 internal fun GaugeHeroCard(state: AppModel.State) {
     val balance = state.lastBalance?.total ?: 0.0
-    val monthCost = state.monthUsage?.totalCost ?: 0.0
     val symbol = currencySymbol(state.currency)
 
     Box(
@@ -89,16 +92,15 @@ internal fun GaugeHeroCard(state: AppModel.State) {
             // 表盘（固定尺寸居中；中心叠余额大数字）
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                 GaugeDial(
-                    ratio = if (balance + monthCost > 0.0) (monthCost / (balance + monthCost)).coerceIn(0.0, 1.0) else 0.0,
+                    readout = runwayReadout(balance, state.monthUsage),
                     balance = balance,
-                    monthCost = monthCost,
                     symbol = symbol
                 )
             }
             Spacer(Modifier.height(12.dp))
 
             // 底部指标胶囊（靠左排布，右侧留给吉祥物；
-            // 「本月已用」不再重复展示——表盘中心已含该读数）
+            // 「本月已用」不在这里展示——下方用量卡已有累计读数，表盘中心专注余额与续航）
             Row(verticalAlignment = Alignment.CenterVertically) {
                 HeroChip("赠送", state.lastBalance?.granted, symbol)
                 Spacer(Modifier.width(8.dp))
@@ -118,11 +120,11 @@ internal fun GaugeHeroCard(state: AppModel.State) {
     }
 }
 
-/** 240° 仪表盘：刻度 + 轨道 + 进度弧 + 金色端点铆钉；中心叠「余额」读数 */
+/** 240° 仪表盘：刻度 + 轨道 + 续航弧 + 金色端点铆钉；中心叠「余额 + 预计可用天数」读数 */
 @Composable
-private fun GaugeDial(ratio: Double, balance: Double, monthCost: Double, symbol: String) {
+private fun GaugeDial(readout: RunwayReadout, balance: Double, symbol: String) {
     val animated by animateFloatAsState(
-        targetValue = ratio.toFloat(),
+        targetValue = readout.ratio,
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 45f),
         label = "gaugeRatio"
     )
@@ -149,12 +151,52 @@ private fun GaugeDial(ratio: Double, balance: Double, monthCost: Double, symbol:
                 maxLines = 1
             )
             Text(
-                "本月已用 " + symbol + format(monthCost) + " · " + (ratio * 100).toInt().toString() + "%",
-                color = Color.White.copy(alpha = 0.72f),
-                style = MaterialTheme.typography.labelSmall
+                readout.label,
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.labelMedium
             )
         }
     }
+}
+
+/** 续航读数：label 为表盘中心副标签；ratio 为指针弧占比（满弧 = 30 天） */
+private data class RunwayReadout(val label: String, val ratio: Float)
+
+/** 满弧对应的续航天数：以一个月为"满箱" */
+private const val RUNWAY_FULL_DAYS = 30.0
+
+/** 由余额 + 本月用量推出续航读数（纯函数；usage 为 null 表示用量数据未就绪） */
+private fun runwayReadout(balance: Double, usage: MonthUsage?): RunwayReadout {
+    val avg = recentDailyCost(usage)
+        ?: return RunwayReadout("预计可用 —", 1f) // 数据未就绪，不贸然报"耗尽"
+    if (balance <= 0.0) return RunwayReadout("余额已耗尽", 0f)
+    if (avg <= 0.0) return RunwayReadout("近期无消耗", 1f)
+    val days = balance / avg
+    val ratio = (days / RUNWAY_FULL_DAYS).toFloat().coerceIn(0f, 1f)
+    val label = when {
+        days >= RUNWAY_FULL_DAYS -> "预计可用 30 天以上"
+        days >= 1.0 -> "预计可用 " + floor(days).toInt().toString() + " 天"
+        else -> "预计可用不足 1 天"
+    }
+    return RunwayReadout(label, ratio)
+}
+
+/**
+ * 近 N 日日均费用（平台统计口径为北京时间）：N = min(7, 本月已过天数)——
+ * 本月之前的日桶不在 monthUsage 的查询窗口内，窗口只向月初方向收缩。
+ * 无用量日按 0 计（消耗速率不应跳过空闲日）；usage 为 null 时返回 null。
+ */
+private fun recentDailyCost(usage: MonthUsage?): Double? {
+    usage ?: return null
+    val now = Calendar.getInstance(MonthUsage.PLATFORM_TIME_ZONE).apply {
+        set(Calendar.HOUR_OF_DAY, 12) // 正午取 key，避开时区边界
+    }
+    val window = minOf(7, now.get(Calendar.DAY_OF_MONTH))
+    val total = (0 until window).sumOf { offset ->
+        val day = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_MONTH, -offset) }
+        usage.cost(day.time)
+    }
+    return total / window
 }
 
 /** 表盘绘制（几何：stroke 15dp，R = 宽/2 - stroke/2 - 4dp，圆心 y = 4 + R + stroke/2） */
@@ -193,7 +235,7 @@ private fun DrawScope.drawGauge(ratio: Float) {
         )
     }
 
-    // 进度弧（随弹簧动画展开）
+    // 续航弧（随弹簧动画展开：满弧 = 预计可用 30 天）
     if (ratio > 0.003f) {
         drawArc(
             color = Color.White,
