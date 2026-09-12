@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -310,7 +311,7 @@ private fun NotificationCard(
     }
 }
 
-// MARK: - 应用内更新卡（GitHub Release 检查 / 自动下载 / 覆盖安装）
+// MARK: - 应用内更新卡（GitHub Release 检查 / 自动下载 / 覆盖安装；按钮形式，与 macOS 版一致）
 
 @Composable
 private fun UpdateCard(updateManager: UpdateManager) {
@@ -328,15 +329,9 @@ private fun UpdateCard(updateManager: UpdateManager) {
                 )
             }
             Spacer(Modifier.width(12.dp))
-            Switch(checked = updateManager.autoCheck, onCheckedChange = { updateManager.autoCheck = it })
+            updateControl(updateManager, state)
         }
         when (val s = state) {
-            is UpdateState.Idle -> {
-                Spacer(Modifier.height(6.dp))
-                TextButton(onClick = { updateManager.checkForUpdate() }, contentPadding = PaddingValues(start = 0.dp)) {
-                    Text("检查更新")
-                }
-            }
             is UpdateState.Downloading -> {
                 Spacer(Modifier.height(10.dp))
                 LinearProgressIndicator(progress = { s.progress }, modifier = Modifier.fillMaxWidth())
@@ -354,20 +349,29 @@ private fun UpdateCard(updateManager: UpdateManager) {
                 }
             }
             is UpdateState.Failed -> {
-                Spacer(Modifier.height(6.dp))
-                Row {
-                    TextButton(onClick = { updateManager.checkForUpdate() }, contentPadding = PaddingValues(start = 0.dp)) {
-                        Text("重试")
-                    }
-                    if (updateManager.hasStagedApk) {
-                        TextButton(onClick = { updateManager.installReadyApk() }) {
-                            Text("重新安装")
-                        }
+                if (updateManager.hasStagedApk) {
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = { updateManager.installReadyApk() }, contentPadding = PaddingValues(start = 0.dp)) {
+                        Text("重新安装")
                     }
                 }
             }
-            is UpdateState.Checking, is UpdateState.UpToDate, is UpdateState.Installing -> {}
+            else -> {}
         }
+    }
+}
+
+/** 右侧状态控件：检查/重试按钮常驻可点，检查与安装进行中用小指示器占位 */
+@Composable
+private fun updateControl(updateManager: UpdateManager, state: UpdateState) {
+    when (state) {
+        UpdateState.Idle, UpdateState.UpToDate ->
+            FilledTonalButton(onClick = { updateManager.checkForUpdate() }) { Text("检查更新") }
+        UpdateState.Checking, UpdateState.Installing ->
+            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+        is UpdateState.Failed ->
+            FilledTonalButton(onClick = { updateManager.checkForUpdate() }) { Text("重试") }
+        is UpdateState.Downloading, is UpdateState.ReadyToInstall -> {}
     }
 }
 
