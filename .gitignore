@@ -1,0 +1,19 @@
+.build/
+build/
+.DS_Store
+*.xcuserstate
+
+# Windows 版（windows/）构建产物
+windows/**/bin/
+windows/**/obj/
+windows/.vs/
+windows/publish/
+
+# iOS 版（ios/）构建产物
+ios/**/xcuserdata/
+ios/**/DerivedData/
+ios/build*/
+ios/DeepSeekMeterCore/.build/
+
+# VSCode 本地配置（不入库）
+.vscode/

@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    name: Build & Test (macOS)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Build (debug)
+        run: swift build
+
+      - name: Build (release)
+        run: swift build -c release
+
+      - name: Run self-tests
+        run: bash Scripts/run-tests.sh
+
+      - name: Package .app
+        run: bash Scripts/build-app.sh release
+
+      - name: Smoke check (launch 6s)
+        run: |
+          ./build/DeepSeekMeter.app/Contents/MacOS/DeepSeekMeter &
+          APP_PID=$!
+          sleep 6
+          if kill -0 $APP_PID 2>/dev/null; then
+            echo "进程存活 ✓"
+            kill $APP_PID
+          else
+            echo "进程崩溃 ✗"
+            exit 1
+          fi
+
+      - name: Upload .app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeekMeter.app
+          path: build/DeepSeekMeter.app
+
+  windows-build:
+    name: Build & Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build (Release)
+        run: dotnet build windows/DeepSeekMeter.sln -c Release
+
+      - name: Run self-tests
+        run: dotnet run --project windows/tests/DeepSeekMeter.Selftest -c Release
+
+      - name: Smoke check (launch 6s)
+        shell: pwsh
+        run: |
+          $exe = "windows/src/DeepSeekMeter/bin/Release/net8.0-windows/DeepSeekMeter.exe"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 6
+          if (-not $p.HasExited) {
+            Write-Host "进程存活 ✓"
+            Stop-Process -Id $p.Id -Force
+          } else {
+            Write-Host "进程崩溃 ✗ ExitCode=$($p.ExitCode)"
+            exit 1
+          }
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeekMeter-Windows
+          path: windows/src/DeepSeekMeter/bin/Release/net8.0-windows
+
+  ios-build:
+    name: Build & Test (iOS)
+    runs-on: macos-15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Core drift check（macOS 核心改动需同步到 iOS 核心包）
+        run: bash Scripts/check-core-drift.sh
+
+      - name: Core self-tests（核心包，macOS 上直接跑，无需模拟器）
+        run: swift run --package-path ios/DeepSeekMeterCore DeepSeekMeterCoreSelftest
+
+      - name: Project structure check（无 Xcode 静态校验）
+        run: python3 Scripts/check-ios-project.py
+
+      - name: Build app (iOS Simulator, no signing)
+        run: |
+          xcodebuild -project ios/DeepSeekMeter.xcodeproj -scheme DeepSeekMeter \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Upload iOS .app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DeepSeekMeter-iOS.app
+          path: ios/build/Build/Products/Debug-iphonesimulator/DeepSeekMeter.app
+
+  android-build:
+    name: Build & Test (Android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Core tests + App debug build (JVM unit tests + Compose compile)
+        run: |
+          chmod +x android/gradlew
+          cd android && ./gradlew :core:test :app:assembleDebug --no-daemon
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
