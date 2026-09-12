@@ -48,17 +48,26 @@ struct PopoverView: View {
         }
     }
 
+    /// 服务状态胶囊：点击打开官方服务状态页（status.deepseek.com）查看可用性
     private var statusPill: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(statusText)
-                .font(.caption2.weight(.medium))
+        Button {
+            if let url = URL(string: "https://status.deepseek.com/") {
+                NSWorkspace.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(statusText)
+                    .font(.caption2.weight(.medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(statusColor.opacity(0.14), in: Capsule())
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(statusColor.opacity(0.14), in: Capsule())
+        .buttonStyle(.plain)
+        .help("点击打开 status.deepseek.com 查看 DeepSeek 服务可用性")
     }
 
     private var statusColor: Color {
