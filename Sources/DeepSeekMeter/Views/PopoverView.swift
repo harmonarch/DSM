@@ -500,7 +500,7 @@ struct PopoverView: View {
             }
         case .upToDate:
             HStack(spacing: 10) {
-                Text("暂无更新✅")
+                Text("已是最新")
                     .font(.caption)
                     .foregroundStyle(.green)
                 checkUpdatesButton
