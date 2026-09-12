@@ -40,11 +40,6 @@ struct PopoverView: View {
                 .font(.system(size: 14, weight: .semibold))
             Spacer(minLength: 4)
             statusPill
-            if let lastUpdate = model.lastUpdate {
-                Text(lastUpdate.formatted(date: .omitted, time: .standard))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
