@@ -12,15 +12,15 @@
 
 DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **macOS、Windows、Android**，并在同一仓库提供**开发中的 iOS 源码实现**。它展示 DeepSeek 余额、消费、请求/Token 用量和按天趋势，不把数据发送给任何第三方。
 
-当前最新稳定版本是 **[v0.0.5](https://github.com/harmonarch/DSM/releases/tag/v0.0.5)**。macOS、Windows 和 Android 发布产物由 GitHub Actions 根据版本标签构建；iOS 目前只提供源码，TestFlight/App Store 分发等待 Apple Developer 账号。
+当前最新稳定版本是 **[v0.1.0](https://github.com/harmonarch/DSM/releases/tag/v0.1.0)**。macOS、Windows 和 Android 发布产物由 GitHub Actions 根据版本标签构建；iOS 目前只提供源码，TestFlight/App Store 分发等待 Apple Developer 账号。
 
 ## 平台状态与下载
 
 | 平台 | 当前状态 | 最新发布 / 运行方式 |
 | :--- | :--- | :--- |
-| macOS | 稳定版菜单栏 App | [DSM-0.0.5-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.0.5/DSM-0.0.5-macOS.dmg) |
-| Windows | 稳定版系统托盘 App | [DSM-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.0.5/DSM-win-x64.zip) |
-| Android | A4 已完成；提供直装 APK | [DSM-v0.0.5-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.0.5/DSM-v0.0.5-android.apk) |
+| macOS | 稳定版菜单栏 App | [DSM-0.1.0-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-0.1.0-macOS.dmg) |
+| Windows | 稳定版系统托盘 App | [DSM-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-win-x64.zip) |
+| Android | A4 已完成；提供直装 APK | [DSM-v0.1.0-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-v0.1.0-android.apk) |
 | iOS | M1–M5 源码实现完成，尚未公开分发 | 从 [ios/](ios/README.zh-CN.md) 源码构建 |
 
 ## 功能
@@ -75,7 +75,7 @@ DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **mac
 
 ### Android
 
-1. 直链下载 [DSM-v0.0.5-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.0.5/DSM-v0.0.5-android.apk)。
+1. 直链下载 [DSM-v0.1.0-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-v0.1.0-android.apk)。
 2. 以侧载 APK 方式安装；Android 可能要求允许打开该文件的应用安装未知来源应用。
 3. APK 使用 debug 签名，便于直装，不代表 Play 商店发布或发布者身份认证。
 
