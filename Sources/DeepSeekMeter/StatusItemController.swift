@@ -44,13 +44,15 @@ final class StatusItemController: NSObject {
         hosting.autoresizingMask = [.width, .height]
         self.hostingView = hosting
 
-        // 玻璃质感底衬：SwiftUI 内容之下垫一层系统材质，半透明 UI 后面呈现磨砂玻璃观感；
-        // macOS 26+ 用 NSGlassEffectView（液态玻璃），旧系统回退 NSVisualEffectView
+        // 玻璃质感底衬：SwiftUI 内容之下垫一层系统材质，半透明 UI 后面呈现磨砂玻璃观感。
+        // NSGlassEffectView 是 macOS 26 新增 API，旧 SDK（如 CI 的 macos-15 镜像）没有该符号，
+        // 不能直接引用——用 NSClassFromString 运行时查找：macOS 26+ 返回液态玻璃，
+        // 其余环境自动回退 NSVisualEffectView
         let container = NSView(frame: NSRect(x: 0, y: 0, width: width, height: 620))
-        if #available(macOS 26.0, *) {
-            let glass = NSGlassEffectView(frame: container.bounds)
+        if let glassType = NSClassFromString("NSGlassEffectView") as? NSView.Type {
+            let glass = glassType.init(frame: container.bounds)
             glass.autoresizingMask = [.width, .height]
-            glass.contentView = hosting
+            glass.setValue(hosting, forKey: "contentView")
             container.addSubview(glass)
         } else {
             let effect = NSVisualEffectView(frame: container.bounds)
