@@ -38,9 +38,13 @@ final class AppModel: ObservableObject {
     init(settings: SettingsStore) {
         self.settings = settings
         self.update = UpdateService()
-        // update 是嵌套的 ObservableObject：SwiftUI 只订阅 AppModel 自身的变更，
-        // 不把 update 的 objectWillChange 转发出来的话，检查/下载状态变化不会触发视图重绘
+        // update / settings 都是嵌套的 ObservableObject：SwiftUI 只订阅 AppModel 自身的变更，
+        // 不把它们的 objectWillChange 转发出来的话，检查/下载状态、设置项（开机自启/刷新间隔/账号行）
+        // 的变化都不会触发视图重绘——开关类控件会停留在旧渲染状态，点击写入的就是反值
         update.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        settings.objectWillChange
             .sink { [weak self] _ in self?.objectWillChange.send() }
             .store(in: &cancellables)
     }
