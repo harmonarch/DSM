@@ -32,9 +32,9 @@ DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **mac
 
 ## 截图
 
-| macOS — 已登录 | macOS — 登录提示 | iOS 模拟器 |
-| :---: | :---: | :---: |
-| ![macOS 已登录](images/pic-1.png) | ![macOS 登录提示](images/pic-2.png) | ![iOS 模拟器](ios/screenshots/simulator-home-v2.png) |
+| macOS — 悬浮窗 | Android — 真机 |
+| :---: | :---: |
+| ![macOS 悬浮窗](images/screenshot-macos.png) | ![Android 真机](images/screenshot-android.png) |
 
 ## 环境要求
 

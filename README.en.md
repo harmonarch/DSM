@@ -32,9 +32,9 @@ DeepSeekMeter is a lightweight, privacy-first account monitor for **macOS, Windo
 
 ## Screenshots
 
-| macOS — logged in | macOS — sign-in prompt | iOS simulator |
-| :---: | :---: | :---: |
-| ![macOS logged in](images/pic-1.png) | ![macOS sign-in prompt](images/pic-2.png) | ![iOS simulator](ios/screenshots/simulator-home-v2.png) |
+| macOS — popover | Android — device |
+| :---: | :---: |
+| ![macOS popover](images/screenshot-macos.png) | ![Android device](images/screenshot-android.png) |
 
 ## Requirements
 
