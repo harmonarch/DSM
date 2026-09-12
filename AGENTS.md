@@ -78,7 +78,7 @@ Scripts/
   selftest/main.swift            轻量自测源码（swiftc 编译运行）
 .github/workflows/
   ci.yml                         push main / PR：macOS、Windows、iOS、Android 构建与自测
-  release.yml                    打 v* 标签：构建 macOS DMG、Windows ZIP、Android APK 并发布 GitHub Release
+  release.yml                    打 v* 标签：构建 macOS DMG/ZIP 更新包、Windows ZIP、Android APK 与 SHA256SUMS 并发布 GitHub Release
 ```
 
 ## 4. 架构分层（改动必须遵循）
@@ -90,12 +90,13 @@ UI（Views / StatusItemController / LoginWindowController）
         ↓ 读写 @Published 状态
 AppModel / SettingsStore（@MainActor，状态与持久化）
         ↓ 调用
-PlatformService（网络唯一入口） + Models（解码模型）
+PlatformService（DeepSeek 平台接口入口） + UpdateService（GitHub 更新检查，只读） + Models（解码模型）
         ↓
 Foundation / AppKit / SwiftUI / WebKit
 ```
 
-- 所有网络请求只能经过 `PlatformService`；错误统一转为 `PlatformError`（带用户可读的中文 message）
+- DeepSeek 平台的网络请求只能经过 `PlatformService`；错误统一转为 `PlatformError`（带用户可读的中文 message）
+- 应用内更新的网络请求走独立的 `UpdateService`（GET api.github.com 的 releases/latest 与 Release 资源下载，只读、不上报任何本地数据，详见 Sources/DeepSeekMeter/UpdateService.swift；Windows/Android 同构实现）
 - UI 只读模型层的 `@Published` 状态，**不直接发起网络请求**
 - 新接口的响应模型写成 `Decodable` struct 放进 Models.swift，沿用平台 `{code, msg, data: {biz_code, biz_msg, biz_data}}` 包裹结构（注意 `biz_data` 有时是对象、有时是数组，以真实响应为准）
 - 纯函数（格式化、币种符号、聚合计算）放 Formatting.swift / Models.swift 计算属性，并补自测

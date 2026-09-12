@@ -13,6 +13,7 @@ The latest Windows artifact is available in the [v0.0.5 Release](https://github.
 - **Token trend**: daily current-month chart for output, cache-hit or total tokens
 - **Refresh interval**: 15 seconds to 10 minutes
 - **Launch at login**: current-user Registry Run entry, no administrator permission required
+- **In-app updates**: checks GitHub Releases for new versions and downloads them automatically (SHA256-verified); after you confirm, a batch helper mirrors the app directory and restarts once this process exits. Automatic checks can be disabled in settings.
 
 ## Requirements
 
@@ -96,6 +97,7 @@ dotnet run --project windows/tests/DeepSeekMeter.Selftest -c Release
 ## Privacy and data
 
 - Requests go directly to DeepSeek private endpoints: /auth-api/v0/users/current, /api/v0/users/get_user_summary, /api/v0/usage/by_api_key/amount and /api/v0/usage/by_api_key/cost. The token belongs to the signed-in user; the app has no telemetry or third-party upload service.
+- In-app updates make read-only requests to GitHub (releases/latest and asset downloads) purely to check for and fetch new versions. No local data is uploaded; automatic checks can be disabled in settings.
 - The session token is encrypted with Windows DPAPI, bound to the current Windows user, and stored in %APPDATA%/DeepSeekMeter/settings.json.
 - WebView2 login data is stored locally under %LOCALAPPDATA%/DeepSeekMeter/WebView2 and is removed when the app successfully signs out.
 - Tokens are not written to logs, screenshots or third-party services. Do not paste real tokens into issues or source code.

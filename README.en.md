@@ -127,6 +127,7 @@ After launching a desktop or mobile build:
 ## Privacy and data
 
 - Requests go directly from the app to DeepSeek private platform endpoints: /auth-api/v0/users/current, /api/v0/users/get_user_summary, /api/v0/usage/by_api_key/amount and /api/v0/usage/by_api_key/cost. These endpoints are not a public API contract and platform aggregation may have its own reporting delay.
+- In-app updates make **read-only** requests to GitHub (`api.github.com/repos/harmonarch/DSM/releases/latest`, Release asset downloads and SHA256SUMS verification) purely to check for and fetch new versions. No local data is uploaded; automatic checks can be disabled in settings.
 - The app does not send tokens, balances, usage data, telemetry or analytics to this repository owner or any other third party.
 - Token storage is platform-specific: macOS UserDefaults at ~/Library/Preferences/com.deepseek.meter.plist, Windows DPAPI-protected settings, iOS Keychain, and Android Keystore-encrypted ciphertext in SharedPreferences.
 - The iOS widget reads only a non-sensitive balance snapshot from the App Group container. Android background work never receives the token as WorkManager input data.
