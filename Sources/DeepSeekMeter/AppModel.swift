@@ -33,10 +33,16 @@ final class AppModel: ObservableObject {
 
     private let platformService = PlatformService()
     private var timer: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
     init(settings: SettingsStore) {
         self.settings = settings
         self.update = UpdateService()
+        // update 是嵌套的 ObservableObject：SwiftUI 只订阅 AppModel 自身的变更，
+        // 不把 update 的 objectWillChange 转发出来的话，检查/下载状态变化不会触发视图重绘
+        update.objectWillChange
+            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 
     // MARK: - 轮询
