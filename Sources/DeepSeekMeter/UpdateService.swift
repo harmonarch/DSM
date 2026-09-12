@@ -74,6 +74,7 @@ final class UpdateService: ObservableObject {
 
     struct ReleaseInfo {
         let version: String
+        let zipName: String // 更新包原始资源名（SHA256SUMS 按此名匹配行，本地文件沿用该名）
         let zipURL: URL
         let sumsURL: URL?
     }
@@ -196,7 +197,7 @@ final class UpdateService: ObservableObject {
             throw UpdateError.noAsset
         }
         let sumsURL = decoded.assets.first(where: { $0.name == "SHA256SUMS.txt" })?.browserDownloadURL
-        return ReleaseInfo(version: version, zipURL: zipURL, sumsURL: sumsURL)
+        return ReleaseInfo(version: version, zipName: asset.name, zipURL: zipURL, sumsURL: sumsURL)
     }
 
     /// 下载更新包 ZIP 到临时目录（delegate 桥接 async，回调进度）
@@ -207,7 +208,7 @@ final class UpdateService: ObservableObject {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("dsm-update-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let destination = dir.appendingPathComponent("DSM-\(release.version)-macOS.zip")
+        let destination = dir.appendingPathComponent(release.zipName)
         let downloader = ZipDownloader(destination: destination, onProgress: onProgress)
         return try await downloader.start(url: release.zipURL)
     }

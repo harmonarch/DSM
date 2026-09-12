@@ -40,7 +40,7 @@ public sealed class UpdateService
     private static readonly HttpClient Http = CreateHttp();
 
     /// <summary>最新 Release 信息。</summary>
-    public sealed record LatestRelease(string Version, string ZipUrl, string? SumsUrl);
+    public sealed record LatestRelease(string Version, string ZipName, string ZipUrl, string? SumsUrl);
 
     public UpdateSnapshot State { get; private set; } = new(UpdateStateKind.Idle);
 
@@ -88,7 +88,7 @@ public sealed class UpdateService
             PendingVersion = release.Version;
             // 发现新版本即自动下载（替换重启仍需用户点击确认）
             Set(new UpdateSnapshot(UpdateStateKind.Downloading, 0, release.Version));
-            var zipPath = await DownloadAsync(release.ZipUrl, progress =>
+            var zipPath = await DownloadAsync(release.ZipUrl, release.ZipName, progress =>
                 Set(new UpdateSnapshot(UpdateStateKind.Downloading, progress, release.Version)));
             await VerifyChecksumAsync(zipPath, release.SumsUrl);
 
@@ -129,6 +129,7 @@ public sealed class UpdateService
         var root = doc.RootElement;
         var tag = root.GetProperty("tag_name").GetString() ?? "";
         string? zipUrl = null;
+        string? zipName = null;
         string? sumsUrl = null;
         foreach (var asset in root.GetProperty("assets").EnumerateArray())
         {
@@ -137,6 +138,7 @@ public sealed class UpdateService
             if (url is null) continue;
             if (zipUrl is null && name.StartsWith("DSM-", StringComparison.Ordinal) && name.EndsWith("-win-x64.zip", StringComparison.Ordinal))
             {
+                zipName = name;
                 zipUrl = url;
             }
             if (sumsUrl is null && name == "SHA256SUMS.txt")
@@ -150,16 +152,16 @@ public sealed class UpdateService
         }
         var version = tag.Trim();
         if (version.StartsWith("v") || version.StartsWith("V")) version = version[1..];
-        return new LatestRelease(version, zipUrl, sumsUrl);
+        return new LatestRelease(version, zipName!, zipUrl, sumsUrl);
     }
 
-    /// <summary>下载更新包 ZIP 到临时文件（流式写入，按 1% 步进回报进度）。</summary>
-    private static async Task<string> DownloadAsync(string url, Action<double> onProgress)
+    /// <summary>下载更新包 ZIP 到临时文件（文件名沿用 Release 原始资源名，SHA256SUMS 按名匹配；流式写入，按 1% 步进回报进度）。</summary>
+    private static async Task<string> DownloadAsync(string url, string fileName, Action<double> onProgress)
     {
         using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         var total = response.Content.Headers.ContentLength ?? 0;
-        var path = Path.Combine(Path.GetTempPath(), $"dsm-update-{Guid.NewGuid():N}.zip");
+        var path = Path.Combine(Path.GetTempPath(), fileName);
         await using var source = await response.Content.ReadAsStreamAsync();
         await using var target = File.Create(path);
         var buffer = new byte[81920];
