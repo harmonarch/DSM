@@ -48,7 +48,8 @@ enum UpdateError: LocalizedError {
 // MARK: - 更新服务
 
 /// GitHub Release 应用内更新：检查 → 自动下载 → SHA256 校验 → 用户确认后覆盖安装并重启。
-/// 网络仅 GET api.github.com 与 Release 资源（不上报任何本地数据，红线 5）；
+/// 网络仅 GET api.github.com（限流 403/429 时兜底走 github.com 网页端 302）与 Release 资源
+/// （不上报任何本地数据，红线 5）；
 /// 与 PlatformService（DeepSeek 平台接口）分属两个独立网络入口，互不依赖。
 @MainActor
 final class UpdateService: ObservableObject {
