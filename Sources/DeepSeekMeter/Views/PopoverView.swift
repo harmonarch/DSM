@@ -447,10 +447,6 @@ struct PopoverView: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 58, alignment: .leading)
                 Spacer(minLength: 0)
-                if model.isFetching {
-                    ProgressView()
-                        .controlSize(.small)
-                }
                 Toggle("", isOn: launchAtLoginBinding)
                     .labelsHidden()
                     .toggleStyle(.switch)
@@ -479,16 +475,22 @@ struct PopoverView: View {
         UpdateService.currentVersion.map { "v\($0)" } ?? "开发构建"
     }
 
+    /// 检查更新按钮：非开发构建下常驻可点，检查完成后仍可再次检查
+    private var checkUpdatesButton: some View {
+        Button("检查更新") { model.update.checkForUpdates() }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+    }
+
     @ViewBuilder
     private var updateStatusControl: some View {
         switch model.update.state {
         case .idle:
             if !model.update.isDevBuild {
-                Button("检查更新") { model.update.checkForUpdates() }
-                    .buttonStyle(.bordered)
-                    .controlSize(.small)
+                checkUpdatesButton
             }
         case .checking:
+            // 检查中：loading 在更新行原位展示
             HStack(spacing: 6) {
                 ProgressView()
                     .controlSize(.small)
@@ -497,9 +499,12 @@ struct PopoverView: View {
                     .foregroundStyle(.tertiary)
             }
         case .upToDate:
-            Text("暂无更新✅")
-                .font(.caption)
-                .foregroundStyle(.green)
+            HStack(spacing: 10) {
+                Text("暂无更新✅")
+                    .font(.caption)
+                    .foregroundStyle(.green)
+                checkUpdatesButton
+            }
         case .downloading(let progress):
             // 下载进度替代检查更新按钮的原位展示
             HStack(spacing: 6) {
@@ -570,15 +575,6 @@ struct PopoverView: View {
 
     private var footer: some View {
         HStack {
-            Button {
-                model.refresh()
-            } label: {
-                Label(model.isFetching ? "刷新中…" : "刷新", systemImage: "arrow.clockwise")
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(model.isFetching)
-
             if !model.settings.platformToken.isEmpty {
                 Button("退出登录") { model.clearPlatformToken() }
                     .buttonStyle(.plain)
