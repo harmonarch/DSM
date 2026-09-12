@@ -231,6 +231,26 @@ public sealed class MonthUsage
             CacheMiss: day.Data.Sum(m => m.ValueFor("PROMPT_CACHE_MISS_TOKEN")));
     }
 
+    /// <summary>
+    /// 近 N 日日均费用（平台统计口径为北京时间）：N = min(7, 本月已过天数)——
+    /// 本月之前的日桶不在查询窗口内，窗口只向月初方向收缩。
+    /// 无用量日按 0 计（消耗速率不应跳过空闲日）；直接按北京民用时间取日 key，避开 DateTime Kind 陷阱。
+    /// （与 Android 端 GaugeHero / Swift 端 recentDailyCost 同口径；now 可注入便于自测）
+    /// </summary>
+    public double RecentDailyCost(DateTimeOffset? now = null)
+    {
+        var beijingNow = TimeZoneInfo.ConvertTime(now ?? DateTimeOffset.Now, PlatformTimeZone);
+        var window = Math.Min(7, beijingNow.Day);
+        double total = 0;
+        for (var offset = 0; offset < window; offset++)
+        {
+            var key = beijingNow.AddDays(-offset).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var day = CostDays.FirstOrDefault(d => d.Date == key);
+            if (day is not null) total += day.Data.Sum(m => m.Usage.Sum(i => i.Value));
+        }
+        return total / window;
+    }
+
     // MARK: - 工具
 
     private double SumAmount(string type) => AmountModels.Sum(m => m.ValueFor(type));

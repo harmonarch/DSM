@@ -486,6 +486,45 @@ Check(huge.Length > 0, "超大数值格式化非空");
 Check(!huge.Contains("E+") && !huge.Contains("e+"), "超大数值不用科学计数法");
 Check(Formatting.TokenFullString(84217000) == "84,217,000", "正常千分位不变");
 
+// 19. 续航读数（油表语义：余额 ÷ 近 7 日日均费用，满格 = 30 天；与 Android 端 GaugeHero / Swift 自测同口径）
+static UsageDay RunwayCostDay(string date, string cost) => new UsageDay
+{
+    Date = date,
+    Data = [new ModelUsage { Model = "deepseek-chat", Usage = [new UsageItem { Type = "COST", Amount = cost }] }],
+};
+static MonthUsage RunwayUsageFixture() => new MonthUsage
+{
+    Year = 2026,
+    Month = 8,
+    CostDays =
+    [
+        RunwayCostDay("2026-08-01", "1.0"),
+        RunwayCostDay("2026-08-02", "2.0"),
+        RunwayCostDay("2026-08-03", "3.0"),
+        RunwayCostDay("2026-08-04", "4.0"),
+        RunwayCostDay("2026-08-05", "5.0"),
+    ],
+};
+var runwayUsage = RunwayUsageFixture();
+var runwayNow85 = new DateTimeOffset(2026, 8, 5, 12, 0, 0, TimeSpan.FromHours(8));
+var runwayNow82 = new DateTimeOffset(2026, 8, 2, 12, 0, 0, TimeSpan.FromHours(8));
+var runwayNow88 = new DateTimeOffset(2026, 8, 8, 12, 0, 0, TimeSpan.FromHours(8));
+var runwayNow820 = new DateTimeOffset(2026, 8, 20, 12, 0, 0, TimeSpan.FromHours(8));
+Check(Math.Abs(runwayUsage.RecentDailyCost(runwayNow85) - 3.0) < 0.001, "日均窗口：本月已过 5 天窗口收缩为 5（15/5=3）");
+Check(Math.Abs(runwayUsage.RecentDailyCost(runwayNow88) - 2.0) < 0.001, "日均窗口：封顶 7 天且无用量日按 0 计（14/7=2）");
+Check(Math.Abs(runwayUsage.RecentDailyCost(runwayNow82) - 1.5) < 0.001, "日均窗口：月初第 2 天为 2 天（(1+2)/2）");
+Check(Runway.Evaluate(9, null, runwayNow85).Level == RunwayLevel.Unknown, "用量未就绪：中性「预计可用 —」");
+Check(Runway.Evaluate(0, runwayUsage, runwayNow85).Label == "余额已耗尽", "余额 0：耗尽判定优先于无消耗");
+Check(Runway.Evaluate(9, runwayUsage, runwayNow820).Label == "近期无消耗", "近 7 日无消耗：满格中性");
+var runway10 = Runway.Evaluate(30, runwayUsage, runwayNow85);
+Check(runway10.Label == "预计可用 10 天" && Math.Abs(runway10.Ratio - 1.0 / 3.0) < 0.001 && runway10.Level == RunwayLevel.Healthy, "余额 30 日均 3：预计可用 10 天（占比 1/3）");
+Check(Runway.Evaluate(90, runwayUsage, runwayNow85).Label == "预计可用 30 天以上", "满 30 天封顶文案");
+Check(Math.Abs(Runway.Evaluate(90, runwayUsage, runwayNow85).Ratio - 1) < 0.001, "满 30 天占比封顶为 1");
+var runwayHalf = Runway.Evaluate(1.5, runwayUsage, runwayNow85);
+Check(runwayHalf.Label == "预计可用不足 1 天" && runwayHalf.Level == RunwayLevel.Warning, "不足 1 天：警示态");
+var runwayFloor = Runway.Evaluate(89.9, runwayUsage, runwayNow85);
+Check(runwayFloor.Label == "预计可用 29 天" && runwayFloor.Level == RunwayLevel.Healthy, "天数向下取整（29.96…→29）");
+
 if (failures > 0)
 {
     Console.WriteLine($"\n❌ {failures} 项未通过");

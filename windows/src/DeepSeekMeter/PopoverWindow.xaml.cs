@@ -260,6 +260,28 @@ public partial class PopoverWindow : Window
 
     private void UpdateBalance()
     {
+        // 续航读数：余额 ÷ 近 7 日日均费用（满格 = 30 天，与 Android / macOS / iOS 同口径）；
+        // 与 Swift 端一致按「余额缺省 = 0」参与推算，余额与用量缺一才中性显示
+        var runway = Runway.Evaluate(_model.LastBalance?.Total ?? 0, _model.MonthUsage);
+        RunwayText.Text = runway.Label;
+        RunwayText.Foreground = new SolidColorBrush(runway.Level switch
+        {
+            RunwayLevel.Healthy => Color.FromRgb(0x3A, 0x3A, 0x42),
+            RunwayLevel.Warning => Color.FromRgb(0xF0, 0x9E, 0x24),
+            RunwayLevel.Exhausted => Color.FromRgb(0xE5, 0x48, 0x4D),
+            _ => Color.FromRgb(0x9A, 0x9A, 0xA6), // Unknown
+        });
+        // 比率极小（不足 1 天）时保留 3px 最小可见宽度，让「快见底」仍然可读
+        RunwayFill.Width = runway.Level == RunwayLevel.Unknown || runway.Ratio <= 0
+            ? 0
+            : Math.Max(3, Math.Min(64, 64 * runway.Ratio));
+        RunwayFill.Background = new SolidColorBrush(runway.Level switch
+        {
+            RunwayLevel.Warning => Color.FromRgb(0xF0, 0x9E, 0x24),
+            RunwayLevel.Exhausted => Color.FromRgb(0xE5, 0x48, 0x4D),
+            _ => Color.FromRgb(0x4D, 0x6B, 0xFE),
+        });
+
         if (_model.LastBalance is { } balance)
         {
             BalanceCurrencyText.Text = Formatting.CurrencySymbol(balance.Currency);

@@ -315,6 +315,74 @@ public struct MonthUsage: Identifiable {
     }
 }
 
+// MARK: - 续航读数（油表语义：余额按近期消耗速率预计还能用的天数，满格 = 30 天）
+// 与 Android 端 GaugeHero.kt 同口径：近 7 日日均费用（北京时间）、天数向下取整、≥30 显示「30 天以上」
+
+/// 续航健康度（驱动 UI 配色；与 DataStatus 的「数据可信度」语义无关）
+public enum RunwayLevel: Equatable {
+    /// 用量数据未就绪：中性展示，不贸然报「耗尽」也不虚标「满格」
+    case unknown
+    /// 余额已耗尽
+    case exhausted
+    /// 预计可用不足 1 天
+    case warning
+    /// 正常（含「近期无消耗」满格）
+    case healthy
+}
+
+/// 续航读数：label 为展示文案；ratio 为余量占比（0...1，满格 = fullDays 天），供余量条/仪表使用
+public struct RunwayReadout: Equatable {
+    /// 满格对应的续航天数：以一个月为「满箱」
+    public static let fullDays = 30.0
+
+    public let label: String
+    public let ratio: Double
+    public let level: RunwayLevel
+
+    public init(label: String, ratio: Double, level: RunwayLevel) {
+        self.label = label
+        self.ratio = ratio
+        self.level = level
+    }
+}
+
+extension MonthUsage {
+    /// 近 N 日日均费用（平台统计口径为北京时间）：N = min(7, 本月已过天数)——
+    /// 本月之前的日桶不在查询窗口内，窗口只向月初方向收缩。
+    /// 无用量日按 0 计（消耗速率不应跳过空闲日）；正午取日 key，避开时区边界。
+    public func recentDailyCost(on date: Date = Date()) -> Double {
+        let noon = Self.platformCalendar.date(bySettingHour: 12, minute: 0, second: 0, of: date) ?? date
+        let window = min(7, Self.platformCalendar.component(.day, from: noon))
+        let total = (0..<window).reduce(0.0) { sum, offset in
+            guard let day = Self.platformCalendar.date(byAdding: .day, value: -offset, to: noon) else { return sum }
+            return sum + cost(on: day)
+        }
+        return total / Double(window)
+    }
+}
+
+/// 由余额 + 本月用量推出续航读数（纯函数，可测；usage 传 nil 表示用量数据未就绪）
+public func runwayReadout(balance: Double, usage: MonthUsage?, on date: Date = Date()) -> RunwayReadout {
+    guard let usage else {
+        // ratio 归 0 + unknown：UI 以中性样式渲染余量条（不模拟「满格」避免误读）
+        return RunwayReadout(label: "预计可用 —", ratio: 0, level: .unknown)
+    }
+    if balance <= 0 { return RunwayReadout(label: "余额已耗尽", ratio: 0, level: .exhausted) }
+    let avg = usage.recentDailyCost(on: date)
+    if avg <= 0 { return RunwayReadout(label: "近期无消耗", ratio: 1, level: .healthy) }
+    let days = balance / avg
+    let ratio = min(days / RunwayReadout.fullDays, 1)
+    let label: String
+    if days >= RunwayReadout.fullDays {
+        label = "预计可用 30 天以上"
+    } else if days >= 1 {
+        label = "预计可用 \(Int(days.rounded(.down))) 天"
+    } else {
+        label = "预计可用不足 1 天"
+    }
+    return RunwayReadout(label: label, ratio: ratio, level: days >= 1 ? .healthy : .warning)
+}
+
 // MARK: - 数据可信度状态（托盘/悬浮窗/错误提示共用，保证一致）
 
 public enum DataStatus: Equatable {
