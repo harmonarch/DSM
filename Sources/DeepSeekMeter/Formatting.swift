@@ -48,3 +48,24 @@ func tariffPeriod(on date: Date, calendar: Calendar = MonthUsage.platformCalenda
     }
     return .offPeak
 }
+
+// MARK: - 版本号比较（应用内更新判断用）
+
+/// 判断版本号 a 是否严格新于 b（相等或更旧返回 false）。
+/// 支持可选 "v"/"V" 前缀（GitHub tag 形如 v0.0.6）；按 "." 分段逐段比较数值，
+/// 段数不齐按 0 补齐（"1.0" 等价 "1.0.0"），非数字段按 0 处理。
+func isVersion(_ a: String, newerThan b: String) -> Bool {
+    func segments(_ version: String) -> [Int] {
+        var v = version.trimmingCharacters(in: .whitespaces)
+        if v.hasPrefix("v") || v.hasPrefix("V") { v.removeFirst() }
+        return v.split(separator: ".").map { Int($0) ?? 0 }
+    }
+    let lhs = segments(a)
+    let rhs = segments(b)
+    for i in 0..<max(lhs.count, rhs.count) {
+        let l = i < lhs.count ? lhs[i] : 0
+        let r = i < rhs.count ? rhs[i] : 0
+        if l != r { return l > r }
+    }
+    return false
+}

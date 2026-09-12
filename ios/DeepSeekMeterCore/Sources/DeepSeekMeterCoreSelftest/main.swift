@@ -413,6 +413,17 @@ let snap = BalanceSnapshot.load()
 check(abs(snap.balance - 42.5) < 0.001 && snap.currency == "USD", "快照写入/读取")
 check(snap.updated != nil, "快照更新时间")
 
+// 14. 版本号比较（应用内更新判断：GitHub tag 与本地版本比较，对齐 macOS 自测）
+check(isVersion("0.0.6", newerThan: "0.0.5"), "patch 位更新判定为更新")
+check(isVersion("v0.1.0", newerThan: "0.0.9"), "v 前缀剥离 + minor 位更新")
+check(isVersion("V1.2.0", newerThan: "1.1.99"), "大写 V 前缀剥离")
+check(!isVersion("0.0.5", newerThan: "0.0.5"), "相同版本不算更新")
+check(!isVersion("0.0.4", newerThan: "0.0.5"), "旧版本不算更新")
+check(!isVersion("1.0", newerThan: "1.0.0"), "段数不齐按 0 补齐后相等")
+check(isVersion("1.0.1", newerThan: "1.0"), "缺段按 0 补齐可比较")
+check(isVersion("10.0", newerThan: "9.9"), "按数值而非字符串比较（10 > 9）")
+check(!isVersion("abc", newerThan: "0.0.1"), "非法版本按 0 处理不算更新")
+
     // 12. AppModel 状态机（内存 TokenStore + URLProtocol Mock 路由 4 个接口）
     final class MemoryTokenStore: TokenStoring {
         private var stored: String?
