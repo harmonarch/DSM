@@ -2,7 +2,7 @@
 
 The Windows version of DeepSeekMeter is a lightweight **system-tray app** for viewing your DeepSeek balance, spending and token usage. It follows the same platform API contract as the [macOS app](../README.en.md), [iOS source build](../ios/README.md) and [Android app](../android/README.md).
 
-The latest Windows artifact is available in the [v0.1.0 Release](https://github.com/harmonarch/DSM/releases/tag/v0.1.0) as DSM-win-x64.zip.
+The latest Windows artifact is available in the [v0.1.1 Release](https://github.com/harmonarch/DSM/releases/tag/v0.1.1) as DSM-win-x64.zip.
 
 ## Features
 

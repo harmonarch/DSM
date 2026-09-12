@@ -12,15 +12,15 @@
 
 DeepSeekMeter is a lightweight, privacy-first account monitor for **macOS, Windows and Android**, with an **iOS source build** in the same repository. It shows your DeepSeek balance, spending, request/token usage and daily trends without sending data to a third party.
 
-The latest stable release is **[v0.1.0](https://github.com/harmonarch/DSM/releases/tag/v0.1.0)**. macOS, Windows and Android release artifacts are built by GitHub Actions from a version tag; iOS is currently source-only while TestFlight/App Store distribution is pending an Apple Developer account.
+The latest stable release is **[v0.1.1](https://github.com/harmonarch/DSM/releases/tag/v0.1.1)**. macOS, Windows and Android release artifacts are built by GitHub Actions from a version tag; iOS is currently source-only while TestFlight/App Store distribution is pending an Apple Developer account.
 
 ## Platform status and downloads
 
 | Platform | Current status | Latest release / run path |
 | :--- | :--- | :--- |
-| macOS | Stable menu bar app | [DSM-0.1.0-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-0.1.0-macOS.dmg) |
-| Windows | Stable system-tray app | [DSM-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-win-x64.zip) |
-| Android | A4 complete; direct-install APK | [DSM-v0.1.0-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.1.0/DSM-v0.1.0-android.apk) |
+| macOS | Stable menu bar app | [DSM-0.1.1-macOS.dmg](https://github.com/harmonarch/DSM/releases/download/v0.1.1/DSM-0.1.1-macOS.dmg) |
+| Windows | Stable system-tray app | [DSM-win-x64.zip](https://github.com/harmonarch/DSM/releases/download/v0.1.1/DSM-win-x64.zip) |
+| Android | A4 complete; direct-install APK | [DSM-v0.1.1-android.apk](https://github.com/harmonarch/DSM/releases/download/v0.1.1/DSM-v0.1.1-android.apk) |
 | iOS | M1–M5 source implementation complete; distribution not published | Build from [ios/](ios/README.md) |
 
 ## Features
@@ -75,7 +75,7 @@ See the [Windows guide](windows/README.md) for source builds, storage details an
 
 ### Android
 
-1. Download DSM-v0.1.0-android.apk from the [v0.1.0 Release](https://github.com/harmonarch/DSM/releases/tag/v0.1.0).
+1. Download DSM-v0.1.1-android.apk from the [v0.1.1 Release](https://github.com/harmonarch/DSM/releases/tag/v0.1.1).
 2. Install it as a sideloaded APK. Android may require allowing installs from the app used to open the file.
 3. The APK is debug-signed for direct installation and is not a Play Store or publisher-identity build.
 
