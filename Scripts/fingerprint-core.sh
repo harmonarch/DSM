@@ -9,6 +9,7 @@ FILES=(
   "Sources/DeepSeekMeter/PlatformService.swift"
   "Sources/DeepSeekMeter/Models.swift"
   "Sources/DeepSeekMeter/Formatting.swift"
+  "Sources/DeepSeekMeter/WAFGuard.swift"
 )
 OUT="ios/DeepSeekMeterCore/CORE_FINGERPRINT"
 TMP=$(mktemp)

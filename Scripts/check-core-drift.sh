@@ -10,6 +10,7 @@ FILES=(
   "Sources/DeepSeekMeter/PlatformService.swift"
   "Sources/DeepSeekMeter/Models.swift"
   "Sources/DeepSeekMeter/Formatting.swift"
+  "Sources/DeepSeekMeter/WAFGuard.swift"
 )
 FINGER="ios/DeepSeekMeterCore/CORE_FINGERPRINT"
 
