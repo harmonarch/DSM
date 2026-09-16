@@ -6,6 +6,8 @@ enum PlatformError: LocalizedError {
     case http(Int)
     case api(code: Int, msg: String)
     case decoding(String)
+    /// 平台前置风控（AWS WAF）要求浏览器票据，原生请求被挑战/拦截（见 WAFGuard）
+    case wafChallenge
 
     var errorDescription: String? { message }
 
@@ -16,6 +18,8 @@ enum PlatformError: LocalizedError {
             return "请先在设置中填写平台 Token"
         case .network(let detail):
             return "用量获取失败：\(detail)"
+        case .wafChallenge:
+            return "被平台风控拦截（需要浏览器验证），请稍后重试或重新登录"
         case .http(let code):
             return "用量获取失败（HTTP \(code)）"
         case .api(let code, let msg):
@@ -43,7 +47,8 @@ struct PlatformService {
     // MARK: - 接口
 
     /// 校验 Token 并返回用户信息（email、currency）；data / biz_data 为空视为校验失败
-    func fetchCurrentUser(token: String) async throws -> (email: String, currency: String) {
+    /// - Parameter wafCookie: 浏览器上下文解出的 WAF 票据（见 WAFGuard）；被风控挑战时缺它必失败
+    func fetchCurrentUser(token: String, wafCookie: String? = nil) async throws -> (email: String, currency: String) {
         struct CurrentUserData: Decodable {
             let id: String
             let email: String?
@@ -59,7 +64,7 @@ struct PlatformService {
             let msg: String
             let data: CurrentUserBiz?
         }
-        let response: CurrentUserResponse = try await get("/auth-api/v0/users/current", token: token)
+        let response: CurrentUserResponse = try await get("/auth-api/v0/users/current", token: token, wafCookie: wafCookie)
         try ensureSuccess(response.code, msg: response.msg)
         guard let data = response.data else {
             throw PlatformError.api(code: response.code, msg: "用户信息为空")
@@ -146,7 +151,7 @@ struct PlatformService {
 
     // MARK: - 请求
 
-    private func get<T: Decodable>(_ path: String, token: String) async throws -> T {
+    private func get<T: Decodable>(_ path: String, token: String, wafCookie: String? = nil) async throws -> T {
         guard !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw PlatformError.emptyToken
         }
@@ -160,6 +165,10 @@ struct PlatformService {
         request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
         request.setValue("https://platform.deepseek.com/usage", forHTTPHeaderField: "Referer")
         request.setValue("https://platform.deepseek.com", forHTTPHeaderField: "Origin")
+        // WAF 票据只在浏览器上下文解出后才有；没有就空手发（被挑战会抛 wafChallenge）
+        if let wafCookie = wafCookie?.trimmingCharacters(in: .whitespacesAndNewlines), !wafCookie.isEmpty {
+            request.setValue(wafCookie, forHTTPHeaderField: "Cookie")
+        }
         request.timeoutInterval = 15
 
         let data: Data
@@ -170,8 +179,14 @@ struct PlatformService {
             throw PlatformError.network(error.localizedDescription)
         }
 
-        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-            throw PlatformError.http(http.statusCode)
+        if let http = response as? HTTPURLResponse {
+            // 风控挑战（202 / x-amzn-waf-action）单独报错：重试同一请求无意义，需刷新浏览器票据
+            if WAFGuard.isChallenge(status: http.statusCode, headers: http.allHeaderFields) {
+                throw PlatformError.wafChallenge
+            }
+            guard http.statusCode == 200 else {
+                throw PlatformError.http(http.statusCode)
+            }
         }
 
         do {
