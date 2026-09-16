@@ -65,7 +65,14 @@ fi
 echo "  使用设备: $DEVICE_ID"
 xcrun simctl boot "$DEVICE_ID" 2>/dev/null || true
 xcrun simctl bootstatus "$DEVICE_ID" -b >/dev/null 2>&1 || true
-open -a Simulator
+# 打开模拟器界面：Xcode 27 起 Simulator.app 被 DeviceHub.app 取代（老 Xcode 仍用 Simulator）
+# 打不开也不影响后续安装与截图（simctl 无需 GUI 即可工作）
+SIM_UI="$(xcode-select -p)/../Applications/DeviceHub.app"
+if [ -d "$SIM_UI" ]; then
+  open "$SIM_UI" 2>/dev/null || echo "  （未能打开 DeviceHub 界面，继续用 simctl 完成安装与截图）"
+else
+  open -a Simulator 2>/dev/null || echo "  （未能打开 Simulator 界面，继续用 simctl 完成安装与截图）"
+fi
 xcrun simctl install "$DEVICE_ID" "$APP"
 xcrun simctl launch "$DEVICE_ID" com.deepseek.meter.ios
 
