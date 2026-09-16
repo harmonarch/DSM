@@ -322,6 +322,30 @@ check(latestTag(fromReleaseRedirectPath: "/harmonarch/DSM/releases/tag/v0.1.0?x=
 check(latestTag(fromReleaseRedirectPath: "/harmonarch/DSM/releases/latest") == nil, "无 tag 段返回 nil")
 check(latestTag(fromReleaseRedirectPath: "") == nil, "空串返回 nil")
 
+// 14. WAF 风控适配（macOS 27 起原生请求被平台前置 AWS WAF 挑战：202 / x-amzn-waf-action）
+check(WAFGuard.isChallenge(status: 202, headers: nil), "202 视为风控挑战")
+check(WAFGuard.isChallenge(status: 200, headers: ["x-amzn-waf-action": "challenge"]), "状态码正常但带风控头也算拦截")
+check(WAFGuard.isChallenge(status: 405, headers: ["x-amzn-waf-action": "captcha"]), "验证码响应视为拦截")
+check(!WAFGuard.isChallenge(status: 200, headers: nil), "200 且无风控头不算拦截")
+check(!WAFGuard.isChallenge(status: 403, headers: nil), "403 无风控头按普通 HTTP 错误处理")
+
+func wafCookie(_ name: String, _ value: String, _ domain: String) -> HTTPCookie {
+    HTTPCookie(properties: [.name: name, .value: value, .domain: domain, .path: "/"])!
+}
+check(WAFGuard.cookieHeader(from: [wafCookie("aws-waf-token", "ticket-1", ".deepseek.com")]) == "aws-waf-token=ticket-1", "票据组装成 Cookie 头")
+check(
+    WAFGuard.cookieHeader(from: [
+        wafCookie("smidV2", "x", ".deepseek.com"),
+        wafCookie("aws-waf-token", "ticket-2", ".deepseek.com")
+    ]) == "aws-waf-token=ticket-2",
+    "只挑 aws-waf-token，其他 cookie 不混入"
+)
+check(WAFGuard.cookieHeader(from: [wafCookie("aws-waf-token", "t", "platform.deepseek.com")]) == "aws-waf-token=t", "host-only 域也识别")
+check(WAFGuard.cookieHeader(from: [wafCookie("aws-waf-token", "t", ".example.com")]) == nil, "非官方域票据不采用")
+check(WAFGuard.cookieHeader(from: []) == nil, "无 cookie 返回 nil")
+check(WAFGuard.isDeepSeekHost("platform.deepseek.com") && WAFGuard.isDeepSeekHost(".deepseek.com"), "官方域名判定")
+check(!WAFGuard.isDeepSeekHost("evil-deepseek.com") && !WAFGuard.isDeepSeekHost("deepseek.com.evil.com"), "相似域名不被放行")
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)
