@@ -11,15 +11,20 @@ final class LoginWindowController: NSObject, NSWindowDelegate, WKNavigationDeleg
     private var isChecking = false
     private var tokenReceived = false
     private var lastSignature = ""
+    /// 风控冷却截止时间：被 WAF 挑战后要等页面重新答题换票据，冷却期内不重复校验
+    private var wafRetryAfter = Date.distantPast
+    /// 被风控挑战后的冷却时长（秒）
+    private static let wafCooldown: TimeInterval = 10
 
     private let dataStore = WKWebsiteDataStore.nonPersistent()
     private let statusLabel = NSTextField(labelWithString: "正在打开官方登录页…")
     private let platformService = PlatformService()
 
-    private let onToken: (String, String) -> Void
+    /// onToken 参数：平台 Token、账号邮箱、WAF 票据（浏览器解出，原生校验请求需要；见 WAFGuard）
+    private let onToken: (String, String, String?) -> Void
     private let onCancel: () -> Void
 
-    init(onToken: @escaping (String, String) -> Void, onCancel: @escaping () -> Void) {
+    init(onToken: @escaping (String, String, String?) -> Void, onCancel: @escaping () -> Void) {
         self.onToken = onToken
         self.onCancel = onCancel
         super.init()
@@ -129,6 +134,12 @@ final class LoginWindowController: NSObject, NSWindowDelegate, WKNavigationDeleg
                     self.setStatus("等待登录完成…")
                     return
                 }
+                // 风控冷却期内不重复校验：被挑战后要等页面重新答题换票据，
+                // 否则每轮都重载页面 + 遍历候选，请求风暴会加重风控
+                guard Date() >= self.wafRetryAfter else {
+                    self.setStatus("平台风控校验中，稍后自动重试…")
+                    return
+                }
                 self.lastSignature = signature
                 let candidates = Self.tokenCandidates(from: pairs)
                 if candidates.isEmpty {
@@ -152,7 +163,7 @@ final class LoginWindowController: NSObject, NSWindowDelegate, WKNavigationDeleg
     /// 仅允许 DeepSeek 官方域名（*.deepseek.com）
     private static func isDeepSeekDomain(_ url: URL?) -> Bool {
         guard let host = url?.host else { return false }
-        return host == "deepseek.com" || host.hasSuffix(".deepseek.com")
+        return WAFGuard.isDeepSeekHost(host)
     }
 
     private static func tokenCandidates(from pairs: [String: Any]) -> [String] {
@@ -190,21 +201,40 @@ final class LoginWindowController: NSObject, NSWindowDelegate, WKNavigationDeleg
 
     private func validate(candidates: [String]) async {
         guard !tokenReceived else { return }
+        // 平台前置风控（AWS WAF）只认浏览器上下文：带上登录页已解出的票据，原生校验请求才不会被挑战
+        let wafCookie = await currentWAFCookie()
         for token in candidates {
             if tokenReceived { return }
             do {
-                let user = try await platformService.fetchCurrentUser(token: token)
+                let user = try await platformService.fetchCurrentUser(token: token, wafCookie: wafCookie)
                 tokenReceived = true
                 setStatus("已获取 Token ✓")
                 stopPolling()
                 close()
-                onToken(token, user.email)
+                onToken(token, user.email, wafCookie)
+                return
+            } catch PlatformError.wafChallenge {
+                // 风控拦截：继续遍历候选没有意义，让登录页重新答题拿新票据，冷却后再试
+                NSLog("[DeepSeekMeter] login: 校验请求被 WAF 挑战，重载登录页刷新票据")
+                wafRetryAfter = Date().addingTimeInterval(Self.wafCooldown)
+                lastSignature = ""
+                setStatus("平台风控校验中，稍后自动重试…")
+                webView?.reload()
                 return
             } catch {
                 NSLog("[DeepSeekMeter] login: 候选校验失败 - \(error.localizedDescription)")
             }
         }
         setStatus("校验未通过，稍后自动重试…")
+    }
+
+    // MARK: - WAF 票据
+
+    /// 从登录页所在浏览器上下文读取 WAF 票据（页面未解出挑战时为 nil，此时原生请求必被拦）
+    private func currentWAFCookie() async -> String? {
+        guard let store = webView?.configuration.websiteDataStore else { return nil }
+        let cookies = await store.httpCookieStore.allCookies()
+        return WAFGuard.cookieHeader(from: cookies)
     }
 
     // MARK: - 窗口

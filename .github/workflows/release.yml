@@ -91,6 +91,10 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # 只装 platform-tools：action 默认的 "tools" 包已被 Google 从 SDK 仓库下架，
+          # 装它会以 "Failed to find package 'tools'" 让 sdkmanager 退出 1（整步失败）
+          packages: platform-tools
 
       - name: Restore release keystore（固定签名，跨版本覆盖安装的前提）
         env:

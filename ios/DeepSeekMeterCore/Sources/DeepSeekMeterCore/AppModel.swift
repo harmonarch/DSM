@@ -187,15 +187,16 @@ public final class AppModel: ObservableObject {
     // MARK: - 登录
 
     /// 保存新的平台 Token 并立即校验；返回是否成功（登录页 WebView 提取到候选后调用）
+    /// - Parameter wafCookie: 浏览器上下文解出的 WAF 票据（见 WAFGuard）；平台风控挑战下缺它必失败
     @discardableResult
-    public func savePlatformToken(_ newToken: String) async -> Bool {
+    public func savePlatformToken(_ newToken: String, wafCookie: String? = nil) async -> Bool {
         let trimmed = newToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             usageError = PlatformError.emptyToken.message
             return false
         }
         do {
-            let user = try await platformService.fetchCurrentUser(token: trimmed)
+            let user = try await platformService.fetchCurrentUser(token: trimmed, wafCookie: wafCookie)
             token = trimmed
             tokenStore.saveToken(trimmed)
             platformUserName = user.email

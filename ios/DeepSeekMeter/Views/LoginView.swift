@@ -15,9 +15,9 @@ struct LoginView: View {
             VStack(spacing: 0) {
                 LoginWebView(
                     status: $status,
-                    onToken: { token, completion in
+                    onToken: { token, wafCookie, completion in
                         Task { @MainActor in
-                            let ok = await appModel.savePlatformToken(token)
+                            let ok = await appModel.savePlatformToken(token, wafCookie: wafCookie)
                             if ok {
                                 dismiss()
                             }
@@ -101,7 +101,7 @@ struct ManualTokenInputView: View {
 /// WKWebView 封装：官方登录页 + localStorage 轮询提取 Token
 struct LoginWebView: UIViewRepresentable {
     @Binding var status: String
-    let onToken: (String, @escaping (Bool) -> Void) -> Void
+    let onToken: (String, String?, @escaping (Bool) -> Void) -> Void
 
     /// 返回容器 UIView：内部承载主 WKWebView + 可能的 OAuth 弹窗覆盖层
     func makeUIView(context: Context) -> UIView {
@@ -129,7 +129,7 @@ struct LoginWebView: UIViewRepresentable {
 
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         @Binding var status: String
-        let onToken: (String, @escaping (Bool) -> Void) -> Void
+        let onToken: (String, String?, @escaping (Bool) -> Void) -> Void
 
         weak var webView: WKWebView?
         weak var container: UIView?
@@ -141,7 +141,7 @@ struct LoginWebView: UIViewRepresentable {
         private var tokenReceived = false
         private var lastSignature = ""
 
-        init(status: Binding<String>, onToken: @escaping (String, @escaping (Bool) -> Void) -> Void) {
+        init(status: Binding<String>, onToken: @escaping (String, String?, @escaping (Bool) -> Void) -> Void) {
             self._status = status
             self.onToken = onToken
         }
@@ -266,12 +266,23 @@ struct LoginWebView: UIViewRepresentable {
 
         /// 逐候选交给 AppModel 原生侧校验（内部 fetchCurrentUser）
         private func validate(candidates: [String]) {
-            tryNext(candidates, index: 0)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // 平台前置风控（AWS WAF）只认浏览器上下文：带上登录页已解出的票据（见 WAFGuard）
+                let wafCookie = await self.currentWAFCookie()
+                self.tryNext(candidates, index: 0, wafCookie: wafCookie)
+            }
         }
 
-        private func tryNext(_ candidates: [String], index: Int) {
+        /// 从登录页所在浏览器上下文读取 WAF 票据（页面未解出挑战时为 nil，此时原生请求必被拦）
+        private func currentWAFCookie() async -> String? {
+            let cookies = await dataStore.httpCookieStore.allCookies()
+            return WAFGuard.cookieHeader(from: cookies)
+        }
+
+        private func tryNext(_ candidates: [String], index: Int, wafCookie: String?) {
             guard !tokenReceived, index < candidates.count else { return }
-            onToken(candidates[index]) { [weak self] ok in
+            onToken(candidates[index], wafCookie) { [weak self] ok in
                 guard let self else { return }
                 if ok {
                     self.tokenReceived = true
@@ -279,7 +290,7 @@ struct LoginWebView: UIViewRepresentable {
                     self.status = "已获取 Token ✓"
                 } else {
                     self.status = "Token 校验未通过，尝试下一个候选…"
-                    self.tryNext(candidates, index: index + 1)
+                    self.tryNext(candidates, index: index + 1, wafCookie: wafCookie)
                 }
             }
         }

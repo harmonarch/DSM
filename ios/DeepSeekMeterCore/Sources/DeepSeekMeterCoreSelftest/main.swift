@@ -383,6 +383,52 @@ Task {
         check(false, "异常类型不符：\(error)")
     }
 
+    // WAF 风控：202 + x-amzn-waf-action -> PlatformError.wafChallenge（不再当作普通 HTTP 错误）
+    StubURLProtocol.handler = { request in
+        check(request.value(forHTTPHeaderField: "Cookie") == nil, "未提供票据时不带 Cookie 头")
+        let resp = HTTPURLResponse(
+            url: request.url!, statusCode: 202, httpVersion: nil,
+            headerFields: ["x-amzn-waf-action": "challenge"]
+        )!
+        return (resp, Data())
+    }
+    do {
+        _ = try await service.fetchCurrentUser(token: "bad")
+        check(false, "风控挑战应抛错")
+    } catch let error as PlatformError {
+        check(error.message == "被平台风控拦截（需要浏览器验证），请稍后重试或重新登录", "风控挑战文案")
+    } catch {
+        check(false, "异常类型不符：\(error)")
+    }
+
+    // 带上浏览器票据：Cookie 头随请求发出，校验正常通过
+    StubURLProtocol.handler = { request in
+        check(request.value(forHTTPHeaderField: "Cookie") == "aws-waf-token=ticket-abc", "WAF 票据写入 Cookie 头")
+        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+        return (resp, Data(currentUserOK.utf8))
+    }
+    do {
+        let user = try await service.fetchCurrentUser(token: "test-token-abc", wafCookie: "aws-waf-token=ticket-abc")
+        check(user.email == "dev@example.com", "带票据校验成功")
+    } catch {
+        check(false, "带票据校验不应失败：\(error)")
+    }
+
+    // WAFGuard 纯函数（与 macOS 自测同口径）
+    func wafCookie(_ name: String, _ value: String, _ domain: String) -> HTTPCookie {
+        HTTPCookie(properties: [.name: name, .value: value, .domain: domain, .path: "/"])!
+    }
+    check(WAFGuard.isChallenge(status: 202, headers: nil), "202 视为风控挑战")
+    check(WAFGuard.isChallenge(status: 405, headers: ["x-amzn-waf-action": "captcha"]), "验证码响应视为拦截")
+    check(!WAFGuard.isChallenge(status: 200, headers: nil), "200 且无风控头不算拦截")
+    check(!WAFGuard.isChallenge(status: 403, headers: nil), "403 无风控头按普通 HTTP 错误处理")
+    check(WAFGuard.cookieHeader(from: [wafCookie("aws-waf-token", "ticket-1", ".deepseek.com")]) == "aws-waf-token=ticket-1", "票据组装成 Cookie 头")
+    check(WAFGuard.cookieHeader(from: [wafCookie("smidV2", "x", ".deepseek.com")]) == nil, "只挑 aws-waf-token")
+    check(WAFGuard.cookieHeader(from: [wafCookie("aws-waf-token", "t", "platform.deepseek.com")]) == "aws-waf-token=t", "host-only 域也识别")
+    check(WAFGuard.cookieHeader(from: [wafCookie("aws-waf-token", "t", ".example.com")]) == nil, "非官方域票据不采用")
+    check(WAFGuard.cookieHeader(from: []) == nil, "无 cookie 返回 nil")
+    check(!WAFGuard.isDeepSeekHost("evil-deepseek.com") && !WAFGuard.isDeepSeekHost("deepseek.com.evil.com"), "相似域名不被放行")
+
     // 空 token -> PlatformError.emptyToken
     do {
         _ = try await service.fetchCurrentUser(token: "  ")

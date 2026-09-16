@@ -7,6 +7,7 @@ mkdir -p build
 swiftc Scripts/selftest/main.swift \
   Sources/DeepSeekMeter/Models.swift \
   Sources/DeepSeekMeter/Formatting.swift \
+  Sources/DeepSeekMeter/WAFGuard.swift \
   -o build/selftest
 
 ./build/selftest

@@ -53,6 +53,7 @@ Sources/DeepSeekMeter/
   Models.swift                   网络模型（Decodable）+ MonthUsage 聚合模型
   SettingsStore.swift            设置持久化（UserDefaults）+ 开机自启 + 旧钥匙串一次性迁移
   Formatting.swift               format() / currencySymbol() 等纯函数
+  WAFGuard.swift                 平台前置风控（AWS WAF）适配：挑战判定 + 浏览器票据组装（纯函数）
   LoginWindowController.swift    内嵌官方登录页（WKWebView）+ Token 自动提取
   Views/
     PopoverView.swift            悬浮窗主界面（SwiftUI）
@@ -64,7 +65,7 @@ windows/                         Windows 版（.NET 8 + WPF，与 macOS 版功�
   README.md                      Windows 英文说明（含与 macOS 版对应关系）
   README.zh-CN.md                Windows 中文说明
 ios/                             iOS 版（开发中，详见 MOBILE-PLAN.md）
-  DeepSeekMeterCore/             共享核心 Swift Package（PlatformService / Models / Formatting / TokenStoring / AppModel，零第三方依赖；AppModel 注入 TokenStoring+URLSession，可在 macOS 上自测）
+  DeepSeekMeterCore/             共享核心 Swift Package（PlatformService / Models / Formatting / WAFGuard / TokenStoring / AppModel，零第三方依赖；AppModel 注入 TokenStoring+URLSession，可在 macOS 上自测）
   DeepSeekMeter.xcodeproj        iOS App 工程（SwiftUI，Xcode 16 同步文件夹格式）
   DeepSeekMeter/                 iOS App 源码（AppMain / TokenStore(Keychain) / Views/ / NotificationService / BackgroundRefreshService）
   DeepSeekMeterWidget/            WidgetKit 余额小组件（快照驱动；Token 不进 App Group 共享容器）
@@ -96,6 +97,7 @@ Foundation / AppKit / SwiftUI / WebKit
 ```
 
 - DeepSeek 平台的网络请求只能经过 `PlatformService`；错误统一转为 `PlatformError`（带用户可读的中文 message）
+- 平台前置有 AWS WAF：原生 URLSession 请求可能被挑战（HTTP 202 + `x-amzn-waf-action`，实测 macOS 27 起触发）。登录校验这类接口必须附上浏览器上下文解出的票据（`WAFGuard` + 登录窗 cookie），被挑战时抛 `PlatformError.wafChallenge`，**不要**当作普通 HTTP 错误反复重试（会被判为机器人，加重风控）
 - 应用内更新的网络请求走独立的 `UpdateService`（GET api.github.com 的 releases/latest 与 Release 资源下载，只读、不上报任何本地数据，详见 Sources/DeepSeekMeter/UpdateService.swift；Windows/Android 同构实现）
 - UI 只读模型层的 `@Published` 状态，**不直接发起网络请求**
 - 新接口的响应模型写成 `Decodable` struct 放进 Models.swift，沿用平台 `{code, msg, data: {biz_code, biz_msg, biz_data}}` 包裹结构（注意 `biz_data` 有时是对象、有时是数组，以真实响应为准）
