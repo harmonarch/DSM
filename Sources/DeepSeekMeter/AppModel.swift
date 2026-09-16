@@ -182,10 +182,10 @@ final class AppModel: ObservableObject {
     /// 打开内嵌登录窗口：登录成功后自动获取并校验 Token
     func beginPlatformLogin() {
         loginController = LoginWindowController(
-            onToken: { [weak self] token, _ in
+            onToken: { [weak self] token, _, wafCookie in
                 Task { @MainActor [weak self] in
                     guard let self else { return }
-                    let ok = await self.savePlatformToken(token)
+                    let ok = await self.savePlatformToken(token, wafCookie: wafCookie)
                     if ok {
                         self.onLoginSucceeded?()
                     }
@@ -200,15 +200,16 @@ final class AppModel: ObservableObject {
     var onLoginSucceeded: (() -> Void)?
 
     /// 保存新的平台 Token 并立即校验；返回是否成功
+    /// - Parameter wafCookie: 浏览器上下文解出的 WAF 票据（见 WAFGuard）；平台风控挑战下缺它必失败
     @discardableResult
-    func savePlatformToken(_ token: String) async -> Bool {
+    func savePlatformToken(_ token: String, wafCookie: String? = nil) async -> Bool {
         let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             usageError = PlatformError.emptyToken.message
             return false
         }
         do {
-            let user = try await platformService.fetchCurrentUser(token: trimmed)
+            let user = try await platformService.fetchCurrentUser(token: trimmed, wafCookie: wafCookie)
             settings.platformToken = trimmed
             settings.platformUserName = user.email
             currency = user.currency
