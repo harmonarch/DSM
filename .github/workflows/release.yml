@@ -6,9 +6,21 @@ on:
     tags: ["v*"]
 
 jobs:
+  version-check:
+    name: Version Check（tag 与代码版本号一致）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 拦住「打了 v0.1.5 标签但代码里还是 0.1.4」——否则会发出版本号错误的 Release
+      - name: Check tag matches four-platform version
+        run: bash Scripts/check-version-sync.sh "${GITHUB_REF_NAME}"
+
   build-macos:
     name: Build macOS
     runs-on: macos-15
+    needs: version-check
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,6 +56,7 @@ jobs:
   build-windows:
     name: Build Windows
     runs-on: windows-latest
+    needs: version-check
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,6 +92,7 @@ jobs:
   build-android:
     name: Build Android APK
     runs-on: ubuntu-latest
+    needs: version-check
     steps:
       - name: Checkout
         uses: actions/checkout@v4
