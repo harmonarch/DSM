@@ -6,6 +6,17 @@ on:
   pull_request:
 
 jobs:
+  version-sync:
+    name: Version Sync（四端版本号一致）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 版本号散在 macOS / Windows / Android / iOS 四个文件里，历史上有过漏改 iOS 的情况
+      - name: Version sync check（四端版本号必须一致）
+        run: bash Scripts/check-version-sync.sh
+
   build-and-test:
     name: Build & Test (macOS)
     runs-on: macos-15
