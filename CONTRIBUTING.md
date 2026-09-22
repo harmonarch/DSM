@@ -97,7 +97,7 @@ Keep the project inside these lines — they are privacy and stability commitmen
 
 ## Release Process (maintainers)
 
-1. Bump `Scripts/Info.plist` (`CFBundleShortVersionString` and `CFBundleVersion`)
+1. Bump all four platforms in one shot: `bash Scripts/bump-version.sh <x.y.z>` (macOS plist, Android, Windows, iOS — the script re-checks that all four agree)
 2. Verify with `bash Scripts/build-app.sh release`
 3. Tag and push: `git tag v0.1.0 && git push origin v0.1.0`
 4. [release.yml](.github/workflows/release.yml) builds the DMG and publishes the GitHub Release automatically

@@ -34,10 +34,15 @@ bash Scripts/run-ios-simulator.sh
 
 # Android 核心单测（需 JDK 17 + Android SDK；JVM 直跑无需设备）
 cd android && ./gradlew :core:test
+
+# 版本号（四端一致性校验；发版用 bump-version.sh 一处改全，见第 7 节）
+bash Scripts/check-version-sync.sh
+bash Scripts/bump-version.sh 0.1.5
 ```
 
 CI 的验证链：`swift build` → `swift build -c release` → `run-tests.sh` → `build-app.sh release` → 冒烟启动 6 秒。
 **任何改动都必须保证这条链全部通过。**
+另有独立的 version-sync job：`Scripts/check-version-sync.sh` 校验 macOS / Windows / Android / iOS 四端版本号一致，不一致直接失败。
 
 注意：`swift run` 时 `Bundle.main.bundleIdentifier` 为 nil，开机自启注册会被跳过（SettingsStore 中已处理），这是预期行为，不是 Bug。
 
@@ -75,10 +80,12 @@ android/                         Android 版（A4 已完成，A5 规划中，详
   core/src/test/                 本地 JVM 单测（无需设备；org.json 测试期用官方 jar 替身）
 Scripts/
   build-app.sh / install.sh / notarize.sh / publish-windows.ps1 / run-tests.sh / run-ios-tests.sh / make-icon.sh / generate-icon.swift
-  Info.plist                     应用包信息（**版本号在这里改**）
+  bump-version.sh                一处更新四端版本号（发版用，结尾自动校验一致性）
+  check-version-sync.sh          校验四端版本号一致（CI version-sync job 调用）
+  Info.plist                     应用包信息（版本号用 Scripts/bump-version.sh 统一改，勿手改单端）
   selftest/main.swift            轻量自测源码（swiftc 编译运行）
 .github/workflows/
-  ci.yml                         push main / PR：macOS、Windows、iOS、Android 构建与自测
+  ci.yml                         push main / PR：四端版本号一致性、macOS、Windows、iOS、Android 构建与自测
   release.yml                    打 v* 标签：构建 macOS DMG/ZIP 更新包、Windows ZIP、Android APK 与 SHA256SUMS 并发布 GitHub Release
 ```
 
@@ -130,7 +137,7 @@ Foundation / AppKit / SwiftUI / WebKit
 
 ## 7. 发布流程（维护者）
 
-1. 更新 `Scripts/Info.plist` 的 `CFBundleShortVersionString` 与 `CFBundleVersion`，并同步 Android `versionName`/`versionCode` 与 Windows 项目程序集版本
+1. `bash Scripts/bump-version.sh <x.y.z>` 一处更新四端版本号（macOS plist、Android `versionName`+`versionCode`、Windows 程序集版本、iOS `MARKETING_VERSION`+build 号）；脚本结尾会跑 `check-version-sync.sh` 确认四端一致
 2. 本地 `bash Scripts/build-app.sh release` 验证
 3. 打标签推送：`git tag v0.1.0 && git push origin v0.1.0`
 4. release.yml 自动构建 macOS DMG、Windows ZIP 和 Android APK 并发布 Release（notes 自动生成；iOS 暂不发布二进制）

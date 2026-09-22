@@ -95,7 +95,7 @@ Conventional Commits + 中文描述：
 
 ## 发布流程（维护者）
 
-1. 更新 `Scripts/Info.plist` 的 `CFBundleShortVersionString` 与 `CFBundleVersion`
+1. `bash Scripts/bump-version.sh <x.y.z>` 一处更新四端版本号（macOS plist、Android、Windows、iOS；脚本结尾自动校验四端一致）
 2. 本地验证 `bash Scripts/build-app.sh release`
 3. 打标签推送：`git tag v0.1.0 && git push origin v0.1.0`
 4. [release.yml](.github/workflows/release.yml) 自动构建 DMG 并发布 GitHub Release
