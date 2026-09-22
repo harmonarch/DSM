@@ -42,7 +42,7 @@ DeepSeekMeter is a lightweight, privacy-first account monitor for **macOS, Windo
 | :--- | :--- | :--- |
 | macOS | macOS 14 or later, Apple Silicon or Intel | Xcode Command Line Tools; full Xcode is not required for the macOS target |
 | Windows | Windows 10 version 1809 or later / Windows 11; the release ZIP is self-contained | .NET 8 SDK; WebView2 Runtime is usually available, but install it separately or use the manual token fallback if initialization fails |
-| Android | Android 8.0 / API 26 or later; release APK is direct-install and debug-signed | JDK 17 and Android SDK platform 35; the repository Gradle wrapper downloads Gradle 8.14.2 |
+| Android | Android 8.0 / API 26 or later; release APK is direct-install and signed with the project's fixed release key | JDK 17 and Android SDK platform 35; the repository Gradle wrapper downloads Gradle 8.14.2 |
 | iOS | No public binary yet | Xcode 16 or later, iOS 17 deployment target; Apple Developer signing is needed for device distribution |
 
 ## Build from source

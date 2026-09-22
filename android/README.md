@@ -2,11 +2,9 @@
 
 The Android version of DeepSeekMeter lets you check your DeepSeek balance, spending and token usage on the go. It is feature-aligned with the [macOS app](../README.en.md), [Windows app](../windows/README.md) and [iOS source build](../ios/README.md), using the same platform API contract.
 
-The current release is **[v0.0.3](https://github.com/harmonarch/DSM/releases/tag/v0.0.3)**. The Release page contains a direct-install APK named DSM-v0.0.3-android.apk.
-
 > **Status:** A1 skeleton ✅ / A2 core + JVM tests ✅ / A3 Compose app ✅ / **A4 polish ✅** (lifecycle-aware foreground polling, WorkManager background refresh, low-balance notifications, Android 13+ permission UX, WebView popups, PR CI app build and maintainer-recorded real-device QA matrix). A5 widget and store distribution are planned. See [MOBILE-PLAN.md](../MOBILE-PLAN.md), section 4, for the full plan and D6 WorkManager decision.
 
-Build metadata: versionName 0.3.1, versionCode 2, minSdk 26, targetSdk/compileSdk 35. The Android version is managed independently from the iOS project version.
+Build metadata: versionName 0.1.4, versionCode 10, minSdk 26, targetSdk/compileSdk 35. Version numbers are kept in sync across all four platforms by `Scripts/bump-version.sh`.
 
 ## Features
 
@@ -28,9 +26,9 @@ Build metadata: versionName 0.3.1, versionCode 2, minSdk 26, targetSdk/compileSd
 
 ### Install the latest APK
 
-1. Download DSM-v0.0.3-android.apk from the [v0.0.3 Release](https://github.com/harmonarch/DSM/releases/tag/v0.0.3).
+1. Download the latest APK from the [Releases page](https://github.com/harmonarch/DSM/releases).
 2. Install it as a sideloaded APK. Android may ask you to allow the file manager or browser to install unknown apps.
-3. The APK is signed with the Gradle debug key for reproducible direct installation. It is not a Play Store or publisher-identity build.
+3. Release APKs are signed with the project's fixed release key, so in-app updates install straight over the existing app. It is not a Play Store or publisher-identity build.
 4. Open the app, allow notifications if you want low-balance alerts, and choose **Log in**.
 
 ### Build and install from source
@@ -122,7 +120,7 @@ The pull-request and main CI job runs :core:test plus :app:assembleDebug and upl
 
 - WorkManager runs no more often than the platform's 15-minute periodic minimum and is best-effort; it is not an exact alarm.
 - Foreground polling stops when the app goes into the background; the background worker only performs the minimal balance check needed for notification.
-- The v0.3.1 APK is debug-signed and distributed by direct download, not through Google Play.
+- Release APKs are distributed by direct download, not through Google Play, and are signed with the project's fixed release key.
 - A5 widget work and store distribution remain planned.
 
 See the repository [contribution guide](../CONTRIBUTING.md) before changing shared API models, storage or platform behavior.

@@ -4,7 +4,7 @@ DeepSeekMeter 的 Android 版用于随时查看 DeepSeek 账户余额、消费�
 
 > **当前状态：** A1 骨架 ✅ / A2 核心 + JVM 单测 ✅ / A3 Compose App ✅ / **A4 打磨 ✅**（生命周期前台轮询、WorkManager 后台刷新、余额低阈值通知、Android 13+ 权限 UX、WebView popup、PR CI App 构建、维护者记录的真机 QA 矩阵）。A5 小组件和商店分发规划中。完整规划与 D6 WorkManager 决策见 [MOBILE-PLAN.md](../MOBILE-PLAN.md) 第 4 节。
 
-构建元数据：versionName 0.3.1、versionCode 2、minSdk 26、targetSdk/compileSdk 35。Android 版本号与 iOS 工程版本独立维护。
+构建元数据：versionName 0.1.4、versionCode 10、minSdk 26、targetSdk/compileSdk 35。版本号由 `Scripts/bump-version.sh` 在四端间同步维护。
 
 ## 功能
 
@@ -113,7 +113,7 @@ Pull Request 和 main 的 CI 会执行 :core:test 与 :app:assembleDebug，并�
 
 - WorkManager 周期任务不短于平台 15 分钟下限，且属于尽力而为，不是精确定时闹钟。
 - App 进入后台后前台轮询停止；后台 Worker 只做通知所需的最小余额检查。
-- v0.3.1 APK 使用 debug 签名，通过直链下载，不通过 Google Play 分发。
+- Release APK 通过直链下载分发，不通过 Google Play；使用项目固定签名密钥签名。
 - A5 小组件和商店分发仍在规划中。
 
 修改共享接口模型、存储或平台行为前，请先阅读仓库的[贡献指南](../CONTRIBUTING.zh-CN.md)。
