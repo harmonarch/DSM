@@ -18,6 +18,9 @@ final class AppModel: ObservableObject {
 
     @Published var isFetching = false
 
+    /// DeepSeek 服务状态（官方状态页）；与 status 的「数据可信度」是两个独立维度
+    @Published var serviceStatus = ServiceStatusSnapshot(health: .unknown)
+
     /// 当前账户币种（余额/登录接口返回，用于费用展示，不再写死 CNY）
     @Published var currency: String = "CNY"
 
@@ -32,6 +35,11 @@ final class AppModel: ObservableObject {
     }
 
     private let platformService = PlatformService()
+    private let serviceStatusService = ServiceStatusService()
+    /// 上次拉取服务状态页的时间；状态变化慢，且刷新间隔可低至 15s，必须节流
+    private var lastStatusFetch: Date?
+    /// 服务状态最小拉取间隔（秒）
+    private static let statusFetchMinInterval: TimeInterval = 180
     private var timer: Timer?
     private var cancellables = Set<AnyCancellable>()
 
@@ -85,6 +93,7 @@ final class AppModel: ObservableObject {
 
         await fetchBalance()
         await fetchUsage()
+        await fetchServiceHealthIfDue()
     }
 
     /// 余额（平台侧 get_user_summary）
@@ -173,6 +182,15 @@ final class AppModel: ObservableObject {
                 platformTokenExpired = true
             }
         }
+    }
+
+    /// 服务健康度：读 DeepSeek 官方状态页（无需 Token，登录与否都拉），按最小间隔节流
+    private func fetchServiceHealthIfDue() async {
+        if let last = lastStatusFetch, Date().timeIntervalSince(last) < Self.statusFetchMinInterval {
+            return
+        }
+        lastStatusFetch = Date()
+        serviceStatus = await serviceStatusService.fetchStatus()
     }
 
     // MARK: - 平台登录（内嵌官方页面）

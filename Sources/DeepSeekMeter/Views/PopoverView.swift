@@ -32,18 +32,88 @@ struct PopoverView: View {
     // MARK: - 头部
 
     private var header: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.blue)
-            Text("DeepSeek Meter")
-                .font(.system(size: 14, weight: .semibold))
-            Spacer(minLength: 4)
-            statusPill
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.blue)
+                Text("DeepSeek Meter")
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer(minLength: 4)
+                statusPill
+            }
+            if let detail = serviceIncidentDetail {
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(statusDetailColor)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            if let hint = dataFreshnessHint {
+                Text(hint)
+                    .font(.caption2)
+                    .foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
         }
     }
 
-    /// 服务状态胶囊：点击打开官方服务状态页（status.deepseek.com）查看可用性
+    /// 故障/维护中的事件名与开始时间；仅在处于故障期时出现
+    private var serviceIncidentDetail: String? {
+        let status = model.serviceStatus
+        guard status.health.isIncident else { return nil }
+
+        var parts: [String] = []
+        if let title = status.incidentTitle, !title.isEmpty {
+            parts.append(serviceStatusShortTitle(title))
+        }
+        if let startedAt = status.startedAt {
+            parts.append("\(Self.clockFormatter.string(from: startedAt)) 起")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// 胶囊悬浮提示：健康度 + 进行中事件全名与开始时间 + 跳转说明
+    private var statusTooltip: String {
+        let status = model.serviceStatus
+        var lines = ["DeepSeek 服务状态：\(status.health.label)"]
+        if status.health.isIncident {
+            if let title = status.incidentTitle, !title.isEmpty {
+                lines.append("进行中：\(title)")
+            }
+            if let startedAt = status.startedAt {
+                lines.append("开始于 \(Self.clockFormatter.string(from: startedAt))")
+            }
+        }
+        lines.append("点击打开 status.deepseek.com")
+        return lines.joined(separator: "\n")
+    }
+
+    private static let clockFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
+
+    /// 数据可信度提示：胶囊现在只表达服务健康，数据是否新鲜降级为这行小字，仅在非最新时出现
+    private var dataFreshnessHint: String? {
+        switch model.status {
+        case .stale:
+            if let lastUpdate = model.lastUpdate {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "HH:mm"
+                return "数据可能过期 · 最后成功 \(formatter.string(from: lastUpdate))"
+            }
+            return "数据可能过期"
+        case .error:
+            return "数据获取失败"
+        case .tokenExpired:
+            return "登录已过期"
+        default:
+            return nil
+        }
+    }
+
+    /// 服务健康度胶囊：读 DeepSeek 官方状态页（status.deepseek.com），点击可跳转查看详情
     private var statusPill: some View {
         Button {
             if let url = URL(string: "https://status.deepseek.com/") {
@@ -62,27 +132,25 @@ struct PopoverView: View {
             .background(statusColor.opacity(0.14), in: Capsule())
         }
         .buttonStyle(.plain)
-        .help("点击打开 status.deepseek.com 查看 DeepSeek 服务可用性")
+        .help(statusTooltip)
     }
 
     private var statusColor: Color {
-        switch model.status {
-        case .fresh: return .green
-        case .stale: return .orange
-        case .error, .tokenExpired: return .red
-        default: return .gray
+        switch model.serviceStatus.health {
+        case .operational: return .green
+        case .degraded: return .yellow
+        case .partialOutage: return .orange
+        case .fullOutage: return .red
+        case .maintenance: return .blue
+        case .unknown: return .gray
         }
     }
 
-    private var statusText: String {
-        switch model.status {
-        case .fresh: return "可用"
-        case .stale: return "数据可能过期"
-        case .error: return "异常"
-        case .tokenExpired: return "已过期"
-        case .loading: return "加载中"
-        case .notLoggedIn: return "未登录"
-        }
+    private var statusText: String { model.serviceStatus.health.label }
+
+    /// 正文小字配色：胶囊里的 .yellow 当文字太浅，正文降级改橙色保证可读
+    private var statusDetailColor: Color {
+        model.serviceStatus.health == .degraded ? .orange : statusColor
     }
 
     // MARK: - 余额
