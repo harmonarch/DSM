@@ -64,6 +64,8 @@ Sources/DeepSeekMeter/
   PlatformService.swift          DeepSeek 平台私有接口客户端 + PlatformError
   Models.swift                   网络模型（Decodable）+ MonthUsage 聚合模型
   UpdateService.swift            应用内更新检查（GitHub Release 只读，见第 4 节）
+  ServiceStatus.swift            服务健康度模型与状态页解析纯函数（RSC / RSS，可测）
+  ServiceStatusService.swift     DeepSeek 官方服务状态页客户端（status.deepseek.com 只读，见第 4 节）
   SettingsStore.swift            设置持久化（UserDefaults）+ 开机自启 + 旧钥匙串一次性迁移
   Formatting.swift               format() / currencySymbol() 等纯函数
   WAFGuard.swift                 平台前置风控（AWS WAF）适配：挑战判定 + 浏览器票据组装（纯函数）
@@ -112,7 +114,7 @@ UI（Views / StatusItemController / LoginWindowController）
         ↓ 读写 @Published 状态
 AppModel / SettingsStore（@MainActor，状态与持久化）
         ↓ 调用
-PlatformService（DeepSeek 平台接口入口） + UpdateService（GitHub 更新检查，只读） + Models（解码模型）
+PlatformService（DeepSeek 平台接口入口） + UpdateService（GitHub 更新检查，只读） + ServiceStatusService（服务状态页，只读） + Models（解码模型）
         ↓
 Foundation / AppKit / SwiftUI / WebKit
 ```
@@ -120,6 +122,7 @@ Foundation / AppKit / SwiftUI / WebKit
 - DeepSeek 平台的网络请求只能经过 `PlatformService`；错误统一转为 `PlatformError`（带用户可读的中文 message）
 - 平台前置有 AWS WAF：原生 URLSession 请求可能被挑战（HTTP 202 + `x-amzn-waf-action`，实测 macOS 27 起触发）。登录校验这类接口必须附上浏览器上下文解出的票据（`WAFGuard` + 登录窗 cookie），被挑战时抛 `PlatformError.wafChallenge`，**不要**当作普通 HTTP 错误反复重试（会被判为机器人，加重风控）
 - 应用内更新的网络请求走独立的 `UpdateService`（GET api.github.com 的 releases/latest 与 Release 资源下载，只读、不上报任何本地数据，详见 Sources/DeepSeekMeter/UpdateService.swift；Windows/Android 同构实现）
+- 服务健康度的网络请求走独立的 `ServiceStatusService`（GET status.deepseek.com，只读、无鉴权、不上报任何本地数据）。该页由 Flashduty 托管且**没有公开 JSON API**（原 Atlassian 的 `/api/v2/*` 已随迁移失效），因此读页面自身的公开数据源：主用 Next.js 服务端数据流（GET `/` 带 `RSC: 1` 头，取 `active_changes`），解析失败回退标准 RSS `/history.rss`；两条都拿不到时显示「状态未知」而**不是**「运行正常」。页面结构变更时优先修解析器，不要臆造新字段
 - UI 只读模型层的 `@Published` 状态，**不直接发起网络请求**
 - 新接口的响应模型写成 `Decodable` struct 放进 Models.swift，沿用平台 `{code, msg, data: {biz_code, biz_msg, biz_data}}` 包裹结构（注意 `biz_data` 有时是对象、有时是数组，以真实响应为准）
 - 纯函数（格式化、币种符号、聚合计算）放 Formatting.swift / Models.swift 计算属性，并补自测
