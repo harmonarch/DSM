@@ -346,6 +346,111 @@ check(WAFGuard.cookieHeader(from: []) == nil, "无 cookie 返回 nil")
 check(WAFGuard.isDeepSeekHost("platform.deepseek.com") && WAFGuard.isDeepSeekHost(".deepseek.com"), "官方域名判定")
 check(!WAFGuard.isDeepSeekHost("evil-deepseek.com") && !WAFGuard.isDeepSeekHost("deepseek.com.evil.com"), "相似域名不被放行")
 
+// 15. 服务健康度：状态页解析（status.deepseek.com 无公开 JSON API，主用 RSC 数据流、RSS 兜底）
+check(ServiceHealth.operational.label == "运行正常", "健康度文案：运行正常")
+check(ServiceHealth.fullOutage.label == "完全中断", "健康度文案：完全中断")
+check(ServiceHealth.fullOutage.severity > ServiceHealth.partialOutage.severity
+        && ServiceHealth.partialOutage.severity > ServiceHealth.degraded.severity
+        && ServiceHealth.degraded.severity > ServiceHealth.operational.severity, "严重度递增")
+
+// 15.1 影响状态字面量映射（Flashduty 四档 + 维护）
+check(serviceHealth(fromImpactStatus: "operational") == .operational, "影响状态 operational")
+check(serviceHealth(fromImpactStatus: "degraded") == .degraded, "影响状态 degraded")
+check(serviceHealth(fromImpactStatus: "degraded_performance") == .degraded, "影响状态 degraded_performance")
+check(serviceHealth(fromImpactStatus: "partial_outage") == .partialOutage, "影响状态 partial_outage")
+check(serviceHealth(fromImpactStatus: "full_outage") == .fullOutage, "影响状态 full_outage")
+check(serviceHealth(fromImpactStatus: "under_maintenance") == .maintenance, "影响状态 under_maintenance")
+check(serviceHealth(fromImpactStatus: "bogus") == nil, "未知影响状态返回 nil")
+
+// 15.2 RSC 数据流解析（GET / 带 RSC: 1，取 active_changes）
+let rscIdle = """
+1e:["$","$L23",null,{"pageId":6410630422455,"initialData":{"page":{"page_id":6410630422455,"components":[]},"active_changes":[]},"initialDataUpdatedAt":1790151352950}]
+"""
+check(serviceStatusFromRSC(rscIdle)?.health == .operational, "RSC：无进行中事件 -> 运行正常")
+check(serviceStatusFromRSC(rscIdle)?.incidentTitle == nil, "RSC：无事件时不带事件名")
+
+// 字段名与真实响应一致（change_id / title / status / start_at_seconds / affected_components[].status）
+let rscActive = """
+1e:["$","$L23",null,{"initialData":{"active_changes":[{"change_id":7020391134287,"page_id":6410630422455,"type":"incident","title":"DeepSeek 网页/API 性能下降（DeepSeek Web/API Degraded Performance）","status":"investigating","start_at_seconds":1790148933,"affected_components":[{"component_id":"c1","status":"operational"},{"component_id":"c2","status":"partial_outage"}]}]}}]
+"""
+check(serviceStatusFromRSC(rscActive)?.health == .partialOutage, "RSC：受影响组件取最严重")
+check(serviceStatusFromRSC(rscActive)?.incidentTitle?.hasPrefix("DeepSeek 网页/API 性能下降") == true, "RSC：带出进行中事件标题")
+check(serviceStatusFromRSC(rscActive)?.startedAt == Date(timeIntervalSince1970: 1790148933), "RSC：带出事件开始时间")
+
+let rscWorst = """
+{"active_changes":[{"type":"incident","title":"甲","status":"monitoring","affected_components":[{"status":"degraded"}]},{"type":"incident","title":"乙","status":"identified","affected_components":[{"status":"partial_outage"}]}]}
+"""
+check(serviceStatusFromRSC(rscWorst)?.health == .partialOutage, "RSC：多个进行中事件取最严重")
+check(serviceStatusFromRSC(rscWorst)?.incidentTitle == "乙", "RSC：事件名取最严重的那条")
+
+let rscMaintenance = """
+{"active_changes":[{"type":"maintenance","status":"in_progress","affected_components":[]}]}
+"""
+check(serviceStatusFromRSC(rscMaintenance)?.health == .maintenance, "RSC：维护中事件")
+
+let rscNoComponents = """
+{"active_changes":[{"type":"incident","status":"investigating","affected_components":[]}]}
+"""
+check(serviceStatusFromRSC(rscNoComponents)?.health == .degraded, "RSC：进行中事件但读不到组件影响 -> 至少性能下降而非正常")
+
+check(serviceStatusFromRSC("{\"page\":{}}") == nil, "RSC：无 active_changes 字段 -> nil（交给 RSS 兜底）")
+check(serviceStatusFromRSC("") == nil, "RSC：空串 -> nil")
+
+// 括号配对需跳过字符串内的括号
+let rscBrackets = """
+{"active_changes":[{"title":"a]b[c","status":"investigating","affected_components":[{"status":"full_outage"}]}]}
+"""
+check(serviceStatusFromRSC(rscBrackets)?.health == .fullOutage, "RSC：标题含括号不影响数组提取")
+
+// 15.3 RSS 解析（GET /history.rss）
+let rssAllResolved = """
+<?xml version="1.0"?><rss version="2.0"><channel>
+<item><title>DeepSeek 网页/API 性能下降（DeepSeek Web/API Degraded Performance）</title>
+<description>&lt;p&gt;&lt;strong&gt;Status:&lt;/strong&gt; resolved&lt;/p&gt;</description>
+<pubDate>Wed, 23 Sep 2026 15:35:33 +0800</pubDate></item>
+</channel></rss>
+"""
+check(serviceStatusFromRSS(rssAllResolved)?.health == .operational, "RSS：全部 resolved -> 运行正常")
+
+let rssActive = """
+<rss version="2.0"><channel>
+<item><title>DeepSeek 网页/API 性能下降（DeepSeek Web/API Degraded Performance）</title>
+<description>&lt;p&gt;&lt;strong&gt;Status:&lt;/strong&gt; resolved&lt;/p&gt;</description></item>
+<item><title>DeepSeek 网页/API 部分中断（DeepSeek Web/API Partial Outage）</title>
+<description>&lt;p&gt;&lt;strong&gt;Status:&lt;/strong&gt; investigating&lt;/p&gt;</description>
+<pubDate>Wed, 23 Sep 2026 15:35:33 +0800</pubDate></item>
+</channel></rss>
+"""
+check(serviceStatusFromRSS(rssActive)?.health == .partialOutage, "RSS：未 resolved 的进行中事件 -> 部分中断")
+check(serviceStatusFromRSS(rssActive)?.incidentTitle?.hasPrefix("DeepSeek 网页/API 部分中断") == true, "RSS：带出进行中事件标题")
+// 实测 RSS 的 pubDate 等于事件开始时间（同一条 resolved 事件：pubDate == start_at_seconds）
+check(serviceStatusFromRSS(rssActive)?.startedAt == Date(timeIntervalSince1970: 1790148933), "RSS：pubDate 解析为开始时间")
+
+let rssMaintenance = """
+<rss version="2.0"><channel>
+<item><title>计划维护（Scheduled Maintenance）</title>
+<description>&lt;p&gt;&lt;strong&gt;Status:&lt;/strong&gt; monitoring&lt;/p&gt;</description></item>
+</channel></rss>
+"""
+check(serviceStatusFromRSS(rssMaintenance)?.health == .maintenance, "RSS：标题含维护 -> 维护中")
+
+check(serviceStatusFromRSS("<rss></rss>") == nil, "RSS：无条目 -> nil")
+check(serviceStatusFromRSS("") == nil, "RSS：空串 -> nil")
+
+// 15.4 标题推断影响程度（RSS 无结构化影响状态，仅兜底）
+check(serviceHealthFromIncidentTitle("API服务异常(API service partially unavailable)") == .partialOutage, "标题推断：partially unavailable")
+check(serviceHealthFromIncidentTitle("DeepSeek Web/API Full Outage") == .fullOutage, "标题推断：full outage")
+check(serviceHealthFromIncidentTitle("搜索服务异常") == .degraded, "标题推断：无程度词按性能下降")
+
+// 15.5 事件名截断与故障期判定
+check(serviceStatusShortTitle("DeepSeek 网页/API 性能下降（DeepSeek Web/API Degraded Performance）") == "DeepSeek 网页/API 性能下降", "截断中文括号后的英文名")
+check(serviceStatusShortTitle("API服务异常(API service partially unavailable)") == "API服务异常", "截断半角括号后的英文名")
+check(serviceStatusShortTitle("搜索服务异常") == "搜索服务异常", "无括号时原样返回")
+check(ServiceHealth.degraded.isIncident && ServiceHealth.maintenance.isIncident, "降级/维护算故障期")
+check(!ServiceHealth.operational.isIncident && !ServiceHealth.unknown.isIncident, "正常/未知不算故障期")
+check(serviceStatusDateFromRFC822("Wed, 23 Sep 2026 15:35:33 +0800") != nil, "RFC822 时间可解析")
+check(serviceStatusDateFromRFC822("不是时间") == nil, "非法时间返回 nil")
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)
