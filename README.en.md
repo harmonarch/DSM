@@ -25,7 +25,7 @@ DeepSeekMeter is a lightweight, privacy-first account monitor for **macOS, Windo
 
 ### Platform capabilities
 
-- **macOS**: menu bar balance, popover UI and launch-at-login
+- **macOS**: menu bar balance, popover UI, launch-at-login and DeepSeek service health from the official status page
 - **Windows**: system-tray balance colors, WebView2 login and current-user launch-at-login
 - **Android**: lifecycle-aware foreground polling, WorkManager best-effort background refresh and low-balance local notifications
 - **iOS**: SwiftUI app, Keychain token storage, foreground/background refresh, low-balance local notification and snapshot-driven WidgetKit balance widget
@@ -88,6 +88,7 @@ After launching a desktop or mobile build:
 
 - Requests go directly from the app to DeepSeek private platform endpoints: /auth-api/v0/users/current, /api/v0/users/get_user_summary, /api/v0/usage/by_api_key/amount and /api/v0/usage/by_api_key/cost. These endpoints are not a public API contract and platform aggregation may have its own reporting delay.
 - In-app updates make **read-only** requests to GitHub (`api.github.com/repos/harmonarch/DSM/releases/latest`, Release asset downloads and SHA256SUMS verification) purely to check for and fetch new versions. No local data is uploaded; automatic checks can be disabled in settings.
+- Service health reads the official DeepSeek status page (status.deepseek.com): read-only, unauthenticated, and likewise uploads no local data. That page has no public JSON API, so the app reads the page's own public data source; when neither source is reachable it shows "unknown" rather than "operational".
 - The app does not send tokens, balances, usage data, telemetry or analytics to this repository owner or any other third party.
 - Token storage is platform-specific: macOS UserDefaults at ~/Library/Preferences/com.deepseek.meter.plist, Windows DPAPI-protected settings, iOS Keychain, and Android Keystore-encrypted ciphertext in SharedPreferences.
 - The iOS widget reads only a non-sensitive balance snapshot from the App Group container. Android background work never receives the token as WorkManager input data.

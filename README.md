@@ -25,7 +25,7 @@ DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **mac
 
 ### 平台能力
 
-- **macOS**：菜单栏余额、悬浮窗、开机自启
+- **macOS**：菜单栏余额、悬浮窗、开机自启、DeepSeek 服务健康度（读官方状态页）
 - **Windows**：系统托盘余额颜色、WebView2 登录、当前用户开机自启
 - **Android**：跟随生命周期的前台轮询、WorkManager 尽力而为后台刷新、余额低阈值本地通知
 - **iOS**：SwiftUI App、Keychain Token 存储、前后台刷新、余额低阈值本地通知、快照驱动的 WidgetKit 余额小组件
@@ -88,6 +88,7 @@ bash Scripts/run-ios-simulator.sh
 
 - 请求由 App 直接发往 DeepSeek 私有平台接口：/auth-api/v0/users/current、/api/v0/users/get_user_summary、/api/v0/usage/by_api_key/amount、/api/v0/usage/by_api_key/cost。这些不是公开 API 契约，平台聚合本身可能存在统计延迟。
 - 应用内更新会向 GitHub 发出**只读**请求（`api.github.com/repos/harmonarch/DSM/releases/latest` 与 Release 资源下载、SHA256SUMS 校验），仅用于检查和获取新版本，不上传任何本地数据；可在设置中关闭自动检查。
+- 服务健康度读取 DeepSeek 官方状态页（status.deepseek.com）：只读、无鉴权，同样不上报任何本地数据。该页没有公开 JSON API，App 读的是页面自身的公开数据源；两条都拿不到时显示「状态未知」而不是「运行正常」。
 - App 不会把 Token、余额、用量、遥测或分析数据发送给本项目维护者或任何其他第三方。
 - Token 按平台存储：macOS UserDefaults（路径为 ~/Library/Preferences/com.deepseek.meter.plist）、Windows DPAPI 保护的设置、iOS Keychain、Android Keystore 加密后写入 SharedPreferences 的密文。
 - iOS 小组件只从 App Group 读取非敏感余额快照；Android 后台任务不会通过 WorkManager 输入数据接收 Token。
