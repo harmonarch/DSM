@@ -1,12 +1,17 @@
 import AppKit
+import UserNotifications
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let settings = SettingsStore()
     private lazy var model = AppModel(settings: settings)
     private var statusController: StatusItemController?
+    /// 前台展示通知横幅需要 delegate（常驻菜单栏进程，否则前台通知被静默丢弃）
+    private let notificationDelegate = NotificationCenterDelegate()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UNUserNotificationCenter.current().delegate = notificationDelegate
+
         let controller = StatusItemController(model: model)
         statusController = controller
         model.onLoginSucceeded = { [weak self] in

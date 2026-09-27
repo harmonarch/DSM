@@ -122,6 +122,12 @@ final class AppModel: ObservableObject {
             currency = wallet.currency
             lastUpdate = Date()
             lastError = nil
+            // 余额刷新成功后检查低余额通知（纯本地，开关关闭时内部直接返回）
+            NotificationService.notifyLowBalanceIfNeeded(
+                balance: wallet.value,
+                currency: wallet.currency,
+                enabled: settings.lowBalanceAlert
+            )
         } catch {
             // 保留旧余额，仅标记错误（旧数据由 status=stale 标注「可能过期」）
             lastError = (error as? PlatformError)?.message ?? error.localizedDescription
@@ -263,5 +269,7 @@ final class AppModel: ObservableObject {
         lastError = nil
         platformTokenExpired = false
         currency = "CNY"
+        // 退出登录重置低余额提醒标记，重新登录后可再次提醒
+        NotificationService.resetLowBalanceFlag()
     }
 }

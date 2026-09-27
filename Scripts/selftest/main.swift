@@ -490,6 +490,14 @@ check(cacheHitRate(hit: 75, miss: 25) == 0.75, "命中率：75/100 = 0.75")
 check(cacheHitRate(hit: 0, miss: 50) == 0.0, "命中率：全未命中为 0")
 check(cacheHitRate(hit: 0, miss: 0) == nil, "命中率：分母为 0 返回 nil")
 
+// 17. 低余额通知决策（纯函数，对齐 Android LowBalancePolicy 状态机）
+check(lowBalanceDecision(balance: 0, threshold: 1, alerted: false) == LowBalanceDecision(shouldNotify: false, alerted: false), "低余额：余额 0 不通知、不置位")
+check(lowBalanceDecision(balance: -5, threshold: 1, alerted: true) == LowBalanceDecision(shouldNotify: false, alerted: true), "低余额：余额为负保持已提醒状态")
+check(lowBalanceDecision(balance: 1, threshold: 1, alerted: true) == LowBalanceDecision(shouldNotify: false, alerted: false), "低余额：回到阈值即重置标记")
+check(lowBalanceDecision(balance: 5, threshold: 1, alerted: true) == LowBalanceDecision(shouldNotify: false, alerted: false), "低余额：余额高位重置标记")
+check(lowBalanceDecision(balance: 0.5, threshold: 1, alerted: false) == LowBalanceDecision(shouldNotify: true, alerted: true), "低余额：首次跌破阈值通知并置位")
+check(lowBalanceDecision(balance: 0.5, threshold: 1, alerted: true) == LowBalanceDecision(shouldNotify: false, alerted: true), "低余额：同一周期不重复通知")
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)

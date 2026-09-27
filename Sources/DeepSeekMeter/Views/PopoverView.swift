@@ -574,6 +574,20 @@ struct PopoverView: View {
                     .controlSize(.small)
             }
 
+            // 余额提醒：低于当前币种 1 个单位时弹本地通知（纯本地，无第三方推送）
+            HStack(spacing: 8) {
+                Text("余额提醒")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 58, alignment: .leading)
+                Spacer(minLength: 0)
+                Toggle("", isOn: lowBalanceAlertBinding)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .help("余额低于 \(format(NotificationService.lowBalanceThreshold)) 时弹本机通知；同一低余额周期只提醒一次")
+            }
+
             // 检查更新（GitHub Release 检查 / 下载 / 覆盖安装）：左版本号，右按钮与状态
             updateRow
         }
@@ -678,6 +692,17 @@ struct PopoverView: View {
         Binding(
             get: { model.settings.launchAtLogin },
             set: { model.settings.launchAtLogin = $0 }
+        )
+    }
+
+    /// 余额提醒开关：首次开启时申请通知权限（系统只弹一次授权框）
+    private var lowBalanceAlertBinding: Binding<Bool> {
+        Binding(
+            get: { model.settings.lowBalanceAlert },
+            set: { newValue in
+                model.settings.lowBalanceAlert = newValue
+                if newValue { NotificationService.requestAuthorization() }
+            }
         )
     }
 

@@ -32,6 +32,12 @@ final class SettingsStore: ObservableObject {
             UserDefaults.standard.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates)
         }
     }
+    /// 余额低于阈值时弹本地通知（纯本地计算，无第三方推送，见 NotificationService）
+    @Published var lowBalanceAlert: Bool {
+        didSet {
+            UserDefaults.standard.set(lowBalanceAlert, forKey: Keys.lowBalanceAlert)
+        }
+    }
 
     /// 可选的刷新间隔（秒）
     static let intervalOptions: [TimeInterval] = [15, 30, 60, 300, 600]
@@ -42,6 +48,7 @@ final class SettingsStore: ObservableObject {
         static let refreshInterval = "settings.refreshInterval"
         static let launchAtLogin = "settings.launchAtLogin"
         static let autoCheckUpdates = "settings.autoCheckUpdates"
+        static let lowBalanceAlert = "settings.lowBalanceAlert"
     }
 
     init() {
@@ -55,6 +62,8 @@ final class SettingsStore: ObservableObject {
         launchAtLogin = defaults.bool(forKey: Keys.launchAtLogin)
         // 未设置过时默认开启自动检查更新（只读 GitHub Release 元信息，README 隐私章节有披露）
         autoCheckUpdates = defaults.object(forKey: Keys.autoCheckUpdates) as? Bool ?? true
+        // 低余额提醒默认关闭：首次开启时再申请通知权限（避免启动即弹授权）
+        lowBalanceAlert = defaults.bool(forKey: Keys.lowBalanceAlert)
 
         // 一次性迁移：旧版本把 Token 存在钥匙串（ad-hoc 签名导致每次启动都要密码授权）
         // 迁到 UserDefaults 后删除钥匙串条目，此后不再访问钥匙串

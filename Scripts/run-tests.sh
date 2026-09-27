@@ -10,6 +10,7 @@ swiftc Scripts/selftest/main.swift \
   Sources/DeepSeekMeter/WAFGuard.swift \
   Sources/DeepSeekMeter/ServiceStatus.swift \
   Sources/DeepSeekMeter/UsageInsights.swift \
+  Sources/DeepSeekMeter/LowBalancePolicy.swift \
   -o build/selftest
 
 ./build/selftest
