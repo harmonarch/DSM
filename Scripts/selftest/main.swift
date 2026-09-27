@@ -451,6 +451,45 @@ check(!ServiceHealth.operational.isIncident && !ServiceHealth.unknown.isIncident
 check(serviceStatusDateFromRFC822("Wed, 23 Sep 2026 15:35:33 +0800") != nil, "RFC822 时间可解析")
 check(serviceStatusDateFromRFC822("不是时间") == nil, "非法时间返回 nil")
 
+// 16. 按 API Key 聚合（by_api_key 序列 -> 每 Key 本月用量；MonthUsage.aggregated 丢弃了 apiKey 元信息）
+let multiKeyAmountJSON = """
+{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":1785513600,"end":1788192000,"bucket":86400,"models":["m-a","m-b"],"series":[{"api_key":{"tracking_id":"tk-a","name":"key-a","sensitive_id":"sk-a","valid":true},"model":"m-a","buckets":[{"time":1785513600,"usage":{"REQUEST":2,"RESPONSE_TOKEN":100,"PROMPT_CACHE_HIT_TOKEN":50,"PROMPT_CACHE_MISS_TOKEN":10}}]},{"api_key":{"tracking_id":"tk-a","name":"key-a","sensitive_id":"sk-a","valid":false},"model":"m-b","buckets":[{"time":1785513600,"usage":{"REQUEST":1,"RESPONSE_TOKEN":50}}]},{"api_key":{"tracking_id":"tk-b","name":"key-b","sensitive_id":"sk-b","valid":true},"model":"m-a","buckets":[{"time":1785513600,"usage":{"REQUEST":5,"RESPONSE_TOKEN":200}},{"time":1788192000,"usage":{"REQUEST":99}}]},{"api_key":{"tracking_id":"tk-c","name":"key-c","sensitive_id":"sk-c","valid":true},"model":"m-a","buckets":[{"time":1788192000,"usage":{"REQUEST":77}}]}]}}}
+"""
+let multiKeyCostJSON = """
+{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":1785513600,"end":1788192000,"bucket":86400,"models":["m-a","m-b"],"data":[{"currency":"CNY","series":[{"api_key":{"tracking_id":"tk-a","name":"key-a","sensitive_id":"sk-a","valid":true},"model":"m-a","buckets":[{"time":1785513600,"cost":"1.5"}]},{"api_key":{"tracking_id":"tk-a","name":"key-a","sensitive_id":"sk-a","valid":false},"model":"m-b","buckets":[{"time":1785513600,"cost":"0.5"}]},{"api_key":{"tracking_id":"tk-b","name":"key-b","sensitive_id":"sk-b","valid":true},"model":"m-a","buckets":[{"time":1785513600,"cost":"1.5"}]}]}]}}}
+"""
+do {
+    struct AKKBiz: Decodable { let bizCode: Int; let bizMsg: String; let bizData: APIKeyAmountData }
+    struct AKKResp: Decodable { let code: Int; let data: AKKBiz? }
+    struct CKKBiz: Decodable { let bizCode: Int; let bizMsg: String; let bizData: APIKeyCostData }
+    struct CKKResp: Decodable { let code: Int; let data: CKKBiz? }
+    let decoder = JSONDecoder()
+    decoder.keyDecodingStrategy = .convertFromSnakeCase
+    let amount = try decoder.decode(AKKResp.self, from: Data(multiKeyAmountJSON.utf8)).data?.bizData
+    let cost = try decoder.decode(CKKResp.self, from: Data(multiKeyCostJSON.utf8)).data?.bizData
+    let breakdown = apiKeyBreakdown(startTs: 1785513600, endTs: 1788192000, amountData: amount, costData: cost)
+    check(breakdown.count == 2, "按 Key 聚合：仅保留窗口内有用量的 Key（tk-c 全窗口外被剔除）")
+    let keyA = breakdown.first { $0.trackingId == "tk-a" }
+    check(keyA?.requests == 3, "按 Key 聚合：跨 model series 请求数求和 2+1")
+    check(abs((keyA?.responseTokens ?? 0) - 150) < 0.001, "按 Key 聚合：跨 model 输出 token 求和 100+50")
+    check(abs((keyA?.cost ?? 0) - 2.0) < 0.001, "按 Key 聚合：跨 model 费用求和 1.5+0.5")
+    check(keyA?.valid == false, "按 Key 聚合：valid 取 AND（同 Key 一条 false 即失效）")
+    check(keyA?.displayName == "key-a", "按 Key 聚合：展示名取 name")
+    let keyB = breakdown.first { $0.trackingId == "tk-b" }
+    check(keyB?.requests == 5, "按 Key 聚合：窗口外桶不计入（99 被忽略）")
+    check(keyB?.valid == true, "按 Key 聚合：全 valid 的 Key 保持有效")
+    check(breakdown.map(\.trackingId) == ["tk-a", "tk-b"], "按 Key 聚合：按费用降序排序（2.0 > 1.5）")
+    check(apiKeyBreakdown(startTs: 1785513600, endTs: 1788192000, amountData: nil, costData: nil).isEmpty, "按 Key 聚合：无数据返回空数组")
+} catch {
+    check(false, "按 Key 聚合解码抛错：\(error)")
+}
+
+// 16.1 缓存命中率：命中 /（命中 + 未命中）；无缓存用量返回 nil（UI 显示 —）
+check(cacheHitRate(hit: 100, miss: 0) == 1.0, "命中率：全命中为 1")
+check(cacheHitRate(hit: 75, miss: 25) == 0.75, "命中率：75/100 = 0.75")
+check(cacheHitRate(hit: 0, miss: 50) == 0.0, "命中率：全未命中为 0")
+check(cacheHitRate(hit: 0, miss: 0) == nil, "命中率：分母为 0 返回 nil")
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)

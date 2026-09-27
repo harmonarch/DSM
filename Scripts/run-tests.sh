@@ -9,6 +9,7 @@ swiftc Scripts/selftest/main.swift \
   Sources/DeepSeekMeter/Formatting.swift \
   Sources/DeepSeekMeter/WAFGuard.swift \
   Sources/DeepSeekMeter/ServiceStatus.swift \
+  Sources/DeepSeekMeter/UsageInsights.swift \
   -o build/selftest
 
 ./build/selftest

@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
     @Published var lastError: String?
 
     @Published var monthUsage: MonthUsage?
+    /// 本月按 API Key 拆分的用量（与 monthUsage 同一次拉取、同一窗口）
+    @Published var apiKeyUsages: [APIKeyUsage] = []
     @Published var usageError: String?
     @Published var platformTokenExpired = false
 
@@ -172,6 +174,13 @@ final class AppModel: ObservableObject {
                 amountData: amountData,
                 costData: costData
             )
+            // 同一组窗口与响应再算一份「按 API Key」维度（MonthUsage.aggregated 丢弃了 apiKey 元信息）
+            apiKeyUsages = apiKeyBreakdown(
+                startTs: startTs,
+                endTs: endTs,
+                amountData: amountData,
+                costData: costData
+            )
             usageError = nil
             platformTokenExpired = false
             lastUpdate = Date() // 最后成功时间
@@ -248,6 +257,7 @@ final class AppModel: ObservableObject {
     func clearPlatformToken() {
         settings.clearPlatformToken()
         monthUsage = nil
+        apiKeyUsages = []
         usageError = nil
         lastBalance = nil
         lastError = nil

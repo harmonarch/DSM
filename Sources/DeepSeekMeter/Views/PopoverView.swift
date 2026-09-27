@@ -300,6 +300,7 @@ struct PopoverView: View {
                     statCell(title: "本月输出", value: Self.tokenString(usage.responseTokens))
                     statCell(title: "缓存命中", value: Self.tokenString(usage.cacheHitTokens))
                 }
+                cacheHitRateRow(usage: usage)
                 ForEach(usage.amountModels.filter { $0.requests > 0 }) { item in
                     HStack {
                         Text(Self.modelDisplayName(item.model))
@@ -313,6 +314,7 @@ struct PopoverView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                apiKeySection(symbol: symbol)
             } else if model.usageError != nil {
                 expiredOrErrorPrompt
             } else if model.isFetching {
@@ -384,6 +386,62 @@ struct PopoverView: View {
                 .minimumScaleFactor(0.7)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// 缓存命中率行：命中 /（命中 + 未命中）；该区间无缓存相关用量时显示「—」而非 0%
+    private func cacheHitRateRow(usage: MonthUsage) -> some View {
+        let monthRate = cacheHitRate(hit: usage.cacheHitTokens, miss: usage.cacheMissTokens)
+        let today = usage.tokens(on: Date())
+        let todayRate = cacheHitRate(hit: today.cacheHit, miss: today.cacheMiss)
+        return Text("缓存命中率：本月 \(Self.rateString(monthRate)) · 今日 \(Self.rateString(todayRate))")
+            .font(.caption2)
+            .foregroundStyle(.tertiary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static func rateString(_ rate: Double?) -> String {
+        guard let rate else { return "—" }
+        return String(format: "%.1f%%", rate * 100)
+    }
+
+    /// 按 API Key 用量：默认折叠，避免多 Key 账号把面板撑长；失效 Key 标橙
+    @ViewBuilder
+    private func apiKeySection(symbol: String) -> some View {
+        if !model.apiKeyUsages.isEmpty {
+            DisclosureGroup("按 API Key（\(model.apiKeyUsages.count)）") {
+                VStack(alignment: .leading, spacing: 6) {
+                    ForEach(model.apiKeyUsages) { key in
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 6) {
+                                Text(key.displayName)
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+                                if !key.valid {
+                                    Text("已失效")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.orange)
+                                        .padding(.horizontal, 5)
+                                        .padding(.vertical, 1)
+                                        .background(Color.orange.opacity(0.14), in: Capsule())
+                                }
+                                Spacer(minLength: 4)
+                                Text("\(symbol)\(format(key.cost))")
+                                    .font(.caption2.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("\(Self.countString(key.requests)) 次 · 输出 \(Self.tokenString(key.responseTokens))")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .tint(.secondary)
+        }
     }
 
     // MARK: - Token 用量趋势（本月按天）
