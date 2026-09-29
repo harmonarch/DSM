@@ -21,8 +21,19 @@
 `.github/workflows/release.yml` 的 `build-android` job 中：
 `DSM_KEYSTORE_BASE64` → 解码到 `$RUNNER_TEMP`，并导出 `DSM_RELEASE_STORE_FILE` /
 `DSM_RELEASE_STORE_PASSWORD` / `DSM_RELEASE_KEY_ALIAS` / `DSM_RELEASE_KEY_PASSWORD`
-四个环境变量；`android/app/build.gradle.kts` 检测到这些变量即用固定签名，
-未配置时回退 debug 签名（fork / 无 Secret 环境保持可构建）。
+四个环境变量；`android/app/build.gradle.kts` 检测到这些变量即用固定签名。
+
+**没有固定签名时不再回退 debug 签名（fail closed）**：release 变体（`assembleRelease` /
+`bundleRelease` 等）会直接构建失败并提示本文件，因为 debug keystore 由各环境现场生成、
+互不相同，用它签出的包会让已安装正式签名版本的用户永远无法覆盖安装。本机无密钥时若只想
+验证 release 变体能否编译打包，显式放行：
+
+```bash
+./gradlew :app:assembleRelease -PdsmAllowDebugSigning=true   # 仅本机验证，产物严禁发布
+```
+
+tag 发布时 Secret 为空会让 `build-android` 直接失败（不再「警告后照发」），并且构建后还有
+一步签名断言：APK 的签名者若为 `CN=Android Debug`（或读不出签名），Release 不会发布。
 
 ## 本机构建正式签名 APK
 
@@ -38,8 +49,14 @@ DSM_RELEASE_KEY_PASSWORD="$(cat "$KEYDIR/STORE_PASSWORD.txt")" \
 验证签名（确认是 `dsm` 而非 debug）：
 
 ```bash
-keytool -printcert -jarfile android/app/build/outputs/apk/release/app-release.apk
+# 用 apksigner：这些 APK 默认没有 v1(JAR) 签名，keytool -printcert -jarfile 会打印
+# 「不是已签名的 jar 文件」却仍以退出码 0 结束，只看退出码会误判为验证通过。
+"$ANDROID_HOME"/build-tools/*/apksigner verify --print-certs \
+  android/app/build/outputs/apk/release/app-release.apk
 ```
+
+输出的 `Signer #1 certificate DN` 应为 `CN=dsm`，SHA-256 指纹应与上文
+`AD:05:60:C9:…:34:31:3F` 一致；出现 `CN=Android Debug` 说明用错了 debug 签名。
 
 ## 换密钥意味着什么
 

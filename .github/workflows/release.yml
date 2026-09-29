@@ -115,24 +115,70 @@ jobs:
           DSM_KEYSTORE_BASE64: ${{ secrets.DSM_KEYSTORE_BASE64 }}
           DSM_RELEASE_STORE_PASSWORD: ${{ secrets.DSM_RELEASE_STORE_PASSWORD }}
         run: |
-          if [ -n "$DSM_KEYSTORE_BASE64" ]; then
-            KS="$RUNNER_TEMP/dsm-release.keystore"
-            echo "$DSM_KEYSTORE_BASE64" | base64 --decode > "$KS"
-            {
-              echo "DSM_RELEASE_STORE_FILE=$KS"
-              echo "DSM_RELEASE_STORE_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
-              echo "DSM_RELEASE_KEY_ALIAS=dsm"
-              echo "DSM_RELEASE_KEY_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
-            } >> "$GITHUB_ENV"
-            echo "已从 Secret 恢复固定签名密钥（alias=dsm）"
-          else
-            echo "未配置 DSM_KEYSTORE_BASE64 Secret，本次 APK 回退 debug 签名（应用内更新将无法覆盖安装）"
+          # tag 发布必须用固定签名：debug 签名由 runner 现场生成、每个版本都不同，
+          # 用它发布的 APK 会让已安装正式签名版本的用户永远无法覆盖安装（只能卸载重装）。
+          # 本工作流只在维护者仓库的 tag 上运行，宁可让整个 Release 失败，也绝不回退 debug 签名。
+          if [ -z "$DSM_KEYSTORE_BASE64" ]; then
+            echo "::error::未配置 DSM_KEYSTORE_BASE64 Secret，无法用固定签名构建 APK，已中止发布。"
+            echo "请在仓库 Settings → Secrets and variables → Actions 中配置 DSM_KEYSTORE_BASE64 与 DSM_RELEASE_STORE_PASSWORD（生成与备份方法见 docs/release-signing.md），再重新推送标签。"
+            exit 1
           fi
+          KS="$RUNNER_TEMP/dsm-release.keystore"
+          echo "$DSM_KEYSTORE_BASE64" | base64 --decode > "$KS"
+          {
+            echo "DSM_RELEASE_STORE_FILE=$KS"
+            echo "DSM_RELEASE_STORE_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
+            echo "DSM_RELEASE_KEY_ALIAS=dsm"
+            echo "DSM_RELEASE_KEY_PASSWORD=$DSM_RELEASE_STORE_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "已从 Secret 恢复固定签名密钥（alias=dsm）"
 
       - name: Build release APK
         run: |
           chmod +x android/gradlew
           cd android && ./gradlew :core:test :app:assembleRelease --no-daemon
+
+      # 最后一道闸：即使上面的密钥注入或 Gradle 校验被改弱，也不允许 debug 签名的 APK 发布出去
+      - name: Assert APK is not debug-signed（签名断言）
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$APK" ]; then
+            echo "::error::未找到 $APK，构建产物缺失"
+            exit 1
+          fi
+
+          # 优先用 build-tools 自带的 apksigner：它读的是 APK 的 v2/v3 签名块
+          # （minSdk 26 的包默认没有 v1 签名，keytool 那条路不可靠）。
+          # 末尾的 || true 是必需的：set -e + pipefail 下，glob 不匹配（没装 build-tools）会让
+          # 这条命令直接终止脚本，连兜底分支都走不到，只剩一个没有说明的退出码 1。
+          # ${ANDROID_HOME:-} 同理：set -u 下变量未定义会直接报 unbound variable。
+          APKSIGNER=$(ls -1 "${ANDROID_HOME:-}"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1) || true
+          if [ -z "$APKSIGNER" ] && command -v apksigner >/dev/null 2>&1; then
+            APKSIGNER=$(command -v apksigner)
+          fi
+
+          if [ -n "$APKSIGNER" ]; then
+            CERT_OUT=$("$APKSIGNER" verify --print-certs "$APK") || {
+              echo "::error::apksigner 校验失败：APK 未签名或签名已损坏"
+              exit 1
+            }
+          else
+            # 兜底：keytool 只认 v1（JAR）签名，且读不到时仍以退出码 0 打印「不是已签名的 jar 文件」，
+            # 所以必须显式判断输出，不能只看退出码，更不能让它静默通过。
+            CERT_OUT=$(keytool -printcert -jarfile "$APK" 2>&1) || true
+            if [ -z "$CERT_OUT" ] || printf '%s' "$CERT_OUT" | grep -qE "不是已签名的 jar 文件|Not a signed jar file"; then
+              echo "::error::keytool 读不到签名（该 APK 没有 v1 签名），无法确认签名者；请在有 Android build-tools（apksigner）的环境复核"
+              exit 1
+            fi
+          fi
+
+          echo "$CERT_OUT"
+          if printf '%s\n' "$CERT_OUT" | grep -q "CN=Android Debug"; then
+            echo "::error::发布 APK 使用了 Android debug 签名（每个环境/版本都不同，用户无法覆盖安装）；请检查 DSM_KEYSTORE_BASE64 / DSM_RELEASE_* Secret 与 android/app/build.gradle.kts 的签名配置"
+            exit 1
+          fi
+          echo "签名断言通过：未使用 Android debug 签名"
 
       - name: Upload Android artifact
         uses: actions/upload-artifact@v4

@@ -7,6 +7,17 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// release 固定签名的来源：环境变量注入（CI 在 release.yml 里把 Secret 里的 keystore 解码到临时目录；
+// 本机配置方法见 docs/release-signing.md）。密钥本体不入仓库（红线 3）。
+val dsmStoreFilePath = System.getenv("DSM_RELEASE_STORE_FILE")
+
+// 是否显式放行 debug 签名：默认 false，即缺固定签名时 release 构建失败（见文件末尾的校验）。
+// 用 providers.gradleProperty 读取（而非 project.findProperty），对配置缓存友好；
+// 仅限本机无密钥时验证 release 变体能否打包：./gradlew :app:assembleRelease -PdsmAllowDebugSigning=true
+val dsmAllowDebugSigning = providers.gradleProperty("dsmAllowDebugSigning")
+    .map { it.toBoolean() }
+    .getOrElse(false)
+
 android {
     namespace = "com.deepseek.meter.app"
     compileSdk = 35
@@ -24,13 +35,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    // 固定正式签名（可选用）：CI 在 release.yml 里把 Secret 中的 keystore 解码到临时目录，
+    // 固定正式签名：CI 在 release.yml 里把 Secret 中的 keystore 解码到临时目录，
     // 通过 DSM_RELEASE_* 环境变量注入。跨版本签名一致后，应用内下载 APK 才能直接覆盖安装
     //（签名不一致会被系统拒绝，用户只能卸载重装）。密钥本体不入仓库（红线 3），
-    // 本机配置方法见 docs/release-signing.md；未注入环境变量时回退 debug 签名，
-    // 保持无密钥环境可构建（签名仅保证可安装，不构成信任背书）。
+    // 本机配置方法见 docs/release-signing.md。
+    // 未注入环境变量时不再静默回退 debug 签名：debug keystore 由各环境现场生成、互不相同，
+    // 用它签出的 release 包会让已安装正式签名版本的用户永远无法覆盖安装。因此默认让 release
+    // 构建失败（fail closed），只有显式 -PdsmAllowDebugSigning=true 才放行（仅限本机验证打包）。
     signingConfigs {
-        val storeFilePath = System.getenv("DSM_RELEASE_STORE_FILE")
+        val storeFilePath = dsmStoreFilePath
         if (storeFilePath != null) {
             create("dsmRelease") {
                 storeFile = file(storeFilePath)
@@ -44,8 +57,22 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.findByName("dsmRelease")
-                ?: signingConfigs.getByName("debug")
+            // 正式签名缺失时 fail closed：不静默回退 debug 签名，只认显式的 -PdsmAllowDebugSigning=true。
+            val dsmReleaseSigning = signingConfigs.findByName("dsmRelease")
+            signingConfig = when {
+                dsmReleaseSigning != null -> dsmReleaseSigning
+                dsmAllowDebugSigning -> {
+                    logger.warn(
+                        "警告：未注入 DSM_RELEASE_* 环境变量，本次 release 构建使用 debug 签名。" +
+                            "该 APK 严禁用于发布（debug 签名每个环境都不同，已安装正式签名版本的用户" +
+                            "无法覆盖安装），仅限本机验证打包流程。详见 docs/release-signing.md。"
+                    )
+                    signingConfigs.getByName("debug")
+                }
+                // 置空即「没有可用的正式签名」；本次构建会在任务执行前直接失败（见文件末尾的校验），
+                // 不会产出任何 release 包。
+                else -> null
+            }
         }
     }
 
@@ -53,6 +80,34 @@ android {
         compose = true
         // QA 测试通知入口依赖 BuildConfig.DEBUG 门控（仅 debug 构建显示，release 自动剔除）
         buildConfig = true
+    }
+}
+
+// release 构建 fail closed：没有固定签名（且未显式放行 debug 签名）时，任何会产出 release 包
+//（APK / AAB）的构建都在任务执行前失败，杜绝「用 debug 密钥签名发布」。
+// 不把这段判断直接写进 buildTypes.release：android {} 的配置对每次 Gradle 调用都会求值，
+// 在那里抛异常会连 :app:assembleDebug、:core:test 一起失败（debug 构建必须照常可用），
+// 因此改为在任务图确定后判断本次构建是否真的要产出 release 包。
+gradle.taskGraph.whenReady {
+    // Kotlin DSL 里 Action<TaskExecutionGraph> 是「接收者风格」lambda：this 即本次构建的任务图。
+    val releaseArtifactTasks = setOf(
+        "assembleRelease",
+        "packageRelease",
+        "packageReleaseBundle",
+        "bundleRelease",
+    )
+    val buildsReleaseArtifact = allTasks.any { it.name in releaseArtifactTasks }
+    if (dsmStoreFilePath == null && !dsmAllowDebugSigning && buildsReleaseArtifact) {
+        throw GradleException(
+            """
+            未配置 release 签名，已中止本次 release 构建（缺少 DSM_RELEASE_* 环境变量）。
+            用 debug 密钥签名发布 APK 会让已安装正式签名版本的用户永远无法覆盖安装：
+            应用内更新会因签名不一致被系统拒绝，用户只能卸载重装，Token 与设置全部丢失。
+            固定签名的配置与备份方法见 docs/release-signing.md。
+            仅在本机无密钥、只想验证 release 变体能否编译打包时，可显式放行 debug 签名：
+              ./gradlew :app:assembleRelease -PdsmAllowDebugSigning=true
+            """.trimIndent()
+        )
     }
 }
 

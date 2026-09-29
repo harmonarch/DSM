@@ -145,10 +145,14 @@ jobs:
           # 装它会以 "Failed to find package 'tools'" 让 sdkmanager 退出 1（整步失败）
           packages: platform-tools
 
-      - name: Core tests + App debug build (JVM unit tests + Compose compile)
+      - name: Core tests + App debug/release build (JVM unit tests + Compose compile)
         run: |
           chmod +x android/gradlew
-          cd android && ./gradlew :core:test :app:assembleDebug --no-daemon
+          # 同时构建 release 变体：仅在 release 下才会暴露的问题（签名配置、资源裁剪、R8/lintVital 等）
+          # 必须在 PR 阶段就失败，而不是拖到打 tag 发布时。
+          # -PdsmAllowDebugSigning=true 是「显式放行 debug 签名」：CI 不引入签名 Secret（无密钥可用），
+          # 这里只用 debug 签名把 release 变体编译打包一遍；正式发布走 release.yml，必须用固定签名。
+          cd android && ./gradlew :core:test :app:assembleDebug :app:assembleRelease -PdsmAllowDebugSigning=true --no-daemon
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
