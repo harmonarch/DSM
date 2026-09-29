@@ -8,6 +8,8 @@
   4. INFOPLIST_FILE 与 AppIcon 资产路径存在
   5. scheme 的 BlueprintIdentifier 都指向已存在的对象
   6. XCSwiftPackageProductDependency.productName 与 Package.swift 声明的库产品一致
+  7. 签名 entitlements：App 与 Widget 都设置 CODE_SIGN_ENTITLEMENTS，统一引用工程级变量，
+     变量指向的 plist 存在且可解析，两边声明的 App Group 完全一致
 
 用法：python3 Scripts/check-ios-project.py
 """
@@ -167,9 +169,79 @@ if os.path.isfile(scheme):
         if m.group(1) not in objs:
             errors.append(f"scheme 引用未知对象 {m.group(1)}")
 
+# 11. 签名 entitlements：App 与 Widget 必须都设 CODE_SIGN_ENTITLEMENTS，统一引用工程级变量，
+#     变量指向的 plist 必须存在且可解析；两边声明的 App Group 必须完全一致。
+#     免费个人团队用空 entitlements 属预期（两边都没有 App Group 也算通过），只拦「只给一边」的情况。
+proj_settings = {}
+for c in objs.get(p.get("buildConfigurationList"), {}).get("buildConfigurations", []):
+    for k, v in objs.get(c, {}).get("buildSettings", {}).items():
+        if isinstance(v, str):  # 列表型设置（如 GCC_PREPROCESSOR_DEFINITIONS）与路径无关，跳过
+            proj_settings.setdefault(k, set()).add(v)
+
+
+def ent_paths(value):
+    """展开 $(VAR) 为工程级变量的值（未定义则记错）；直接写路径也允许"""
+    m = re.fullmatch(r"\$\(([A-Za-z0-9_]+)\)", str(value).strip())
+    if not m:
+        return [str(value).strip()]
+    vals = proj_settings.get(m.group(1))
+    if not vals:
+        errors.append(f"CODE_SIGN_ENTITLEMENTS 引用的 {m.group(1)} 未在工程级定义")
+        return []
+    return sorted(vals)
+
+
+def ent_groups(rel):
+    """读 entitlements 里的 App Group 列表；越界/缺失/解析失败返回 None，空文件返回空集合"""
+    full = os.path.realpath(os.path.join(root, rel))
+    if not full.startswith(os.path.realpath(root) + os.sep):
+        errors.append(f"CODE_SIGN_ENTITLEMENTS 越界: {rel}"); return None
+    if not os.path.isfile(full):
+        errors.append(f"CODE_SIGN_ENTITLEMENTS 指向的文件不存在: {rel}"); return None
+    out = subprocess.run(["plutil", "-convert", "json", "-o", "-", full], capture_output=True, text=True)
+    if out.returncode != 0:
+        errors.append(f"entitlements 解析失败: {rel}"); return None
+    ent = json.loads(out.stdout)
+    groups = ent.get("com.apple.security.application-groups", [])
+    if not isinstance(groups, list):
+        errors.append(f"entitlements 的 application-groups 不是数组: {rel}"); return None
+    return set(groups)
+
+
+ent_before = len(errors)
+target_groups = {}  # productType -> 该 target 实际声明的 App Group 集合
+for t in p.get("targets", []):
+    target = objs.get(t, {})
+    if target.get("isa") != "PBXNativeTarget":
+        continue
+    cl = objs.get(target.get("buildConfigurationList"), {})
+    for c in cl.get("buildConfigurations", []):
+        cfg = objs.get(c, {})
+        ce = cfg.get("buildSettings", {}).get("CODE_SIGN_ENTITLEMENTS")
+        if not ce:
+            errors.append(f"target {target.get('name', t)} 的 {cfg.get('name', '?')} 配置未设置 CODE_SIGN_ENTITLEMENTS")
+            continue
+        for rel in ent_paths(ce):
+            gs = ent_groups(rel)
+            if gs is not None:
+                target_groups.setdefault(target.get("productType"), set()).update(gs)
+
+app_groups = target_groups.get("com.apple.product-type.application", set())
+ext_groups = target_groups.get("com.apple.product-type.app-extension", set())
+# 双向比较：任一边多声明的 App Group 都会让另一边读不到/写不进共享容器
+for g in sorted(app_groups - ext_groups):
+    errors.append(f"App Group {g} 只在 App 声明，Widget 缺失（小组件读不到快照）")
+for g in sorted(ext_groups - app_groups):
+    errors.append(f"App Group {g} 只在 Widget 声明，App 缺失（App 写不进共享容器）")
+
+if len(errors) == ent_before:
+    print("✅ 签名 entitlements 校验通过（App 与 Widget 均引用 $(DEEPSEEK_ENTITLEMENTS)，App Group 两边一致）")
+else:
+    print("❌ 签名 entitlements 校验失败（详见下方问题列表）")
+
 if errors:
     print("FAIL: 校验发现 " + str(len(errors)) + " 处问题")
     for e in errors:
         print("  -", e)
     sys.exit(1)
-print("✅ iOS 工程结构校验通过（target/配置/包依赖/Info.plist/AppIcon/scheme/包产品名全部自洽）")
+print("✅ iOS 工程结构校验通过（target/配置/包依赖/Info.plist/AppIcon/scheme/包产品名/签名 entitlements 全部自洽）")

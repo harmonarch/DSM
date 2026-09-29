@@ -74,10 +74,9 @@ bash Scripts/run-ios-simulator.sh
 
 1. Xcode -> Settings -> Accounts -> 添加你的免费 Apple ID
 2. 打开 ios/DeepSeekMeter.xcodeproj -> 选中 DeepSeekMeter target -> Signing & Capabilities -> Team 选你的 Apple ID
-3. **关键**：免费个人团队不支持 App Group（小组件要的）。两种处理任选：
-   - 命令行构建：`DEEPSEEK_ENTITLEMENTS=DeepSeekMeter.Free.entitlements xcodebuild ... CODE_SIGNING_ALLOWED=YES`
-   - 或 Xcode 里 target Build Settings -> User-Defined -> 新增 `DEEPSEEK_ENTITLEMENTS` = `DeepSeekMeter.Free.entitlements`（App 与 Widget 两个 target 都要）
-   - 或直接删掉 Signing & Capabilities 里的 App Group 能力（Xcode 会改 entitlements 文件）
+3. **无需额外配置**：工程级 `DEEPSEEK_ENTITLEMENTS` 默认就是 `DeepSeekMeter.Free.entitlements`（空 entitlements，App 与 Widget 两个 target 共用），免费个人团队不支持 App Group（小组件要的），这条路径开箱即用。
+   - 命令行构建如需显式指定：`DEEPSEEK_ENTITLEMENTS=DeepSeekMeter.Free.entitlements xcodebuild ... CODE_SIGNING_ALLOWED=YES`
+   - 不要在 Signing & Capabilities 里手动加 App Group：Xcode 会把能力写进当前 entitlements 文件（即免费默认文件），污染这条零成本路径
 4. 顶部选择你的 iPhone -> Run；手机上点「信任此电脑」
 5. 结果：App 主体（登录/余额/用量/趋势/通知）全部可用；**小组件显示 0**（App Group 不可用，属预期）；证书 7 天过期，需每 7 天连电脑重签
 
@@ -86,8 +85,9 @@ bash Scripts/run-ios-simulator.sh
 1. 注册 https://developer.apple.com/programs/ （需 Apple ID + 付款）
 2. Xcode -> Accounts 添加账号；Signing & Capabilities 选择你的 Team
 3. 在开发者后台注册 App Group ID（`group.com.deepseek.meter`）并勾选到 App 与 Widget 的 profile
-4. 直接 Run 即可；小组件、推送、7 天免重签全部可用
-5. 想正式分发（亲友/上架）：TestFlight / Ad-hoc，见 MOBILE-PLAN.md 决策点 D1
+4. 把工程级 `DEEPSEEK_ENTITLEMENTS` 从 `DeepSeekMeter.Free.entitlements` 改成 `DeepSeekMeter.entitlements`（工程级改一处，App 与 Widget 同时生效；该文件已声明 `group.com.deepseek.meter`）
+5. 直接 Run 即可；小组件、推送、7 天免重签全部可用
+6. 想正式分发（亲友/上架）：TestFlight / Ad-hoc，见 MOBILE-PLAN.md 决策点 D1
 
 ## 真机 CLI 安装（脚本/自动化路径，供参考）
 
