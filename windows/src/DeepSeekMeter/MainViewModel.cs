@@ -53,13 +53,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void InstallUpdate()
     {
         if (Update.StagingDirectory is not { } staging) return;
-        Update.BeginInstall();
         try
         {
             UpdateInstaller.ReplaceAndRestart(staging);
         }
         catch (Exception ex)
         {
+            // 启动失败时状态必须留在 ReadyToInstall：BeginInstall 会置为 Installing，
+            // 而 IsBusy 包含 Installing、CheckForUpdateAsync 又以 IsBusy 直接返回，
+            // 提前置位会把「检查更新 / 重试」永久堵死，只能重启应用。
             MessageBox.Show(
                 $"启动更新失败：{ex.Message}",
                 "DeepSeek Meter",
@@ -67,6 +69,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 MessageBoxImage.Warning);
             return;
         }
+        // helper 已经起来，此时才对外宣称「安装中」，随即退出应用交给 helper 完成替换。
+        Update.BeginInstall();
         Application.Current.Shutdown();
     }
 
