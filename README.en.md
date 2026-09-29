@@ -25,10 +25,23 @@ DeepSeekMeter is a lightweight, privacy-first account monitor for **macOS, Windo
 
 ### Platform capabilities
 
-- **macOS**: menu bar balance, popover UI, launch-at-login and DeepSeek service health from the official status page
-- **Windows**: system-tray balance colors, WebView2 login and current-user launch-at-login
-- **Android**: lifecycle-aware foreground polling, WorkManager best-effort background refresh and low-balance local notifications
-- **iOS**: SwiftUI app, Keychain token storage, foreground/background refresh, low-balance local notification and snapshot-driven WidgetKit balance widget
+The four platforms share one version number and one platform API contract; **the same version number does not mean the same capabilities**. The table below is the authoritative per-platform list, with partial, planned or conditional items noted in the cell:
+
+| Capability | macOS | Windows | Android | iOS |
+| :--- | :---: | :---: | :---: | :---: |
+| Balance / monthly cost / request count / token usage | ✅ | ✅ | ✅ | ✅ |
+| Daily token trend (output / cache-hit / total) | ✅ | ✅ | ✅ | ✅ |
+| Runway reading (balance ÷ 7-day average daily cost, full = 30 days) | ✅ | ✅ | ✅ | ✅ |
+| Cache-hit rate (percentage) | ✅ month/today percentage | — (absolute cache-hit tokens only) | — (absolute only) | — (absolute only) |
+| Per-API-key monthly usage breakdown | ✅ | — | — | — |
+| DeepSeek service health (official status page) | ✅ | — | — | — |
+| Low-balance local notification | ✅ | — | ✅ | ✅ |
+| Persistent entry point | menu bar | system tray | — (A5 widget planned) | WidgetKit widget (App Group requires a paid account; free accounts show 0) |
+| In-app update | ✅ | ✅ | ✅ | — (no public distribution yet) |
+| Launch at login | ✅ | ✅ | not applicable | not applicable |
+| Token storage | UserDefaults (deliberate under ad-hoc signing) | DPAPI | Keystore-encrypted ciphertext in SharedPreferences | Keychain |
+
+How each platform is shaped: macOS shows details in a popover; the Windows tray icon changes color with the balance; the mobile apps poll in the foreground and refresh in the background on a best-effort basis (WorkManager on Android, BGAppRefreshTask on iOS). Token storage, login method and other details are in the platform-specific guides.
 
 ## Screenshots
 

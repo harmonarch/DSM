@@ -9,7 +9,7 @@
 
 ## 1. 背景与目标
 
-- 现状：macOS 菜单栏版（SwiftUI + AppKit，Swift 6 工具链 / Swift 5 语言模式）+ Windows 托盘版（.NET 8 + WPF，功能对齐）+ iOS / Android 移动端实现。
+- 现状：macOS 菜单栏版（SwiftUI + AppKit，Swift 6 工具链 / Swift 5 语言模式）+ Windows 托盘版（.NET 8 + WPF，与 macOS 版共用同一套平台接口契约）+ iOS / Android 移动端实现；四端能力差异见 README 平台能力矩阵。
 - 目标：继续完善 **iOS 手机 App** 与 **Android App** 的验证和分发，让用户随时在手机上查看 DeepSeek 账户余额、消费与 Token 用量。
 - 原则：
   1. 功能与桌面版对齐：余额、本月/今日费用、请求数、Token（输出/缓存命中/缓存未命中）、按模型拆分、按天趋势图。

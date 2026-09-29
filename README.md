@@ -10,7 +10,7 @@
 
 [English](README.en.md)
 
-DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **macOS、Windows、Android**，并在同一仓库提供**开发中的 iOS 源码实现**。它展示 DeepSeek 余额、消费、请求/Token 用量和按天趋势，不把数据发送给任何第三方。
+DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **macOS、Windows、Android**，并在同一仓库提供 **iOS 源码实现**（功能已完成，公开分发仍需 Apple 开发者账号）。它展示 DeepSeek 余额、消费、请求/Token 用量和按天趋势，不把数据发送给任何第三方。
 
 ## 功能
 
@@ -25,10 +25,23 @@ DeepSeekMeter 是一个轻量、注重隐私的账户监视工具，覆盖 **mac
 
 ### 平台能力
 
-- **macOS**：菜单栏余额、悬浮窗、开机自启、DeepSeek 服务健康度（读官方状态页）
-- **Windows**：系统托盘余额颜色、WebView2 登录、当前用户开机自启
-- **Android**：跟随生命周期的前台轮询、WorkManager 尽力而为后台刷新、余额低阈值本地通知
-- **iOS**：SwiftUI App、Keychain Token 存储、前后台刷新、余额低阈值本地通知、快照驱动的 WidgetKit 余额小组件
+四个平台共用同一个版本号与同一套平台接口契约；**版本号相同不代表能力相同**，各端可用的能力以下表为准（部分支持、规划中或条件可用的能力已在单元格内注明）：
+
+| 能力 | macOS | Windows | Android | iOS |
+| :--- | :---: | :---: | :---: | :---: |
+| 余额 / 本月费用 / 请求数 / Token 用量 | ✅ | ✅ | ✅ | ✅ |
+| 按天 Token 趋势（输出 / 缓存命中 / 总量） | ✅ | ✅ | ✅ | ✅ |
+| 续航读数（余额 ÷ 近 7 日均费用，满格 30 天） | ✅ | ✅ | ✅ | ✅ |
+| 缓存命中率（百分比） | ✅ 本月/今日百分比 | —（仅缓存命中 Token 绝对值） | —（仅绝对值） | —（仅绝对值） |
+| 按 API Key 拆分本月用量 | ✅ | — | — | — |
+| DeepSeek 服务健康度（官方状态页） | ✅ | — | — | — |
+| 余额低阈值本地通知 | ✅ | — | ✅ | ✅ |
+| 常驻入口 | 菜单栏 | 系统托盘 | —（A5 小组件规划中） | WidgetKit 小组件（需付费账号的 App Group；免费账号显示 0） |
+| 应用内更新 | ✅ | ✅ | ✅ | —（暂无公开分发） |
+| 开机自启 | ✅ | ✅ | 不适用 | 不适用 |
+| Token 存储 | UserDefaults（ad-hoc 签名刻意为之） | DPAPI | Keystore 加密后存 SharedPreferences | Keychain |
+
+各端实现形态：macOS 悬浮窗展示明细；Windows 托盘图标随余额变色；移动端前台轮询，后台刷新尽力而为（Android 为 WorkManager，iOS 为 BGAppRefreshTask）。Token 存储与登录方式等细节见各端专项说明。
 
 ## 截图
 

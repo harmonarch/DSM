@@ -1,6 +1,6 @@
 # DeepSeekMeter · Android <img src="../images/icon.jpg" width="32" align="absmiddle" alt="DSM">
 
-The Android version of DeepSeekMeter lets you check your DeepSeek balance, spending and token usage on the go. It is feature-aligned with the [macOS app](../README.en.md), [Windows app](../windows/README.md) and [iOS source build](../ios/README.md), using the same platform API contract.
+The Android version of DeepSeekMeter lets you check your DeepSeek balance, spending and token usage on the go. It shares the same platform API contract and core logic with the [macOS app](../README.en.md), [Windows app](../windows/README.md) and [iOS source build](../ios/README.md); the per-platform capability differences are listed in the repository README's [platform capability matrix](../README.en.md#platform-capabilities).
 
 > **Status:** A1 skeleton ✅ / A2 core + JVM tests ✅ / A3 Compose app ✅ / **A4 polish ✅** (lifecycle-aware foreground polling, WorkManager background refresh, low-balance notifications, Android 13+ permission UX, WebView popups, PR CI app build and maintainer-recorded real-device QA matrix). A5 widget and store distribution are planned. See [MOBILE-PLAN.md](../MOBILE-PLAN.md), section 4, for the full plan and D6 WorkManager decision.
 

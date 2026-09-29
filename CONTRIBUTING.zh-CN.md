@@ -40,7 +40,7 @@ Sources/DeepSeekMeter/           App 源码（SwiftUI + AppKit）
   PlatformService.swift          平台接口客户端
   Models.swift                   Decodable 模型 + 聚合
   SettingsStore.swift            UserDefaults 持久化 + 开机自启
-windows/                         Windows 版（.NET 8 + WPF，功能与 macOS 版对齐）
+windows/                         Windows 版（.NET 8 + WPF，与 macOS 版共用同一套平台接口契约；能力差异见 README 平台能力矩阵）
   src/DeepSeekMeter.Core/        纯逻辑库（Models / Formatting / PlatformService / SettingsStore）
   src/DeepSeekMeter/             WPF 应用（MainViewModel / TrayIconController / PopoverWindow / LoginWindow）
   tests/DeepSeekMeter.Selftest/  轻量自测（控制台，零测试框架）

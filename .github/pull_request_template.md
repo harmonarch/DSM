@@ -25,6 +25,7 @@
 - [ ] Android：`cd android && ./gradlew :core:test :app:assembleDebug` 通过（涉及 Android 时）
 - [ ] iOS：`bash Scripts/run-ios-tests.sh` + 模拟器构建通过（涉及 iOS 时）
 - [ ] 手动运行验证过相关场景（UI 改动请附截图）
+- [ ] 新功能已同步到其它端，或在 README 功能矩阵中如实标注（未同步的项写明计划）
 
 ## 边界检查
 

@@ -1,6 +1,6 @@
 # DeepSeekMeter · Android 版 <img src="../images/icon.jpg" width="32" align="absmiddle" alt="DSM">
 
-DeepSeekMeter 的 Android 版用于随时查看 DeepSeek 账户余额、消费和 Token 用量。它与 [macOS 版](../README.md)、[Windows 版](../windows/README.zh-CN.md)、[iOS 源码版](../ios/README.zh-CN.md)功能对齐，使用同一套平台接口契约。
+DeepSeekMeter 的 Android 版用于随时查看 DeepSeek 账户余额、消费和 Token 用量。它与 [macOS 版](../README.md)、[Windows 版](../windows/README.zh-CN.md)、[iOS 源码版](../ios/README.zh-CN.md)共用同一套平台接口契约与核心逻辑，各端能力差异见仓库 README 的[平台能力矩阵](../README.md#平台能力)。
 
 > **当前状态：** A1 骨架 ✅ / A2 核心 + JVM 单测 ✅ / A3 Compose App ✅ / **A4 打磨 ✅**（生命周期前台轮询、WorkManager 后台刷新、余额低阈值通知、Android 13+ 权限 UX、WebView popup、PR CI App 构建、维护者记录的真机 QA 矩阵）。A5 小组件和商店分发规划中。完整规划与 D6 WorkManager 决策见 [MOBILE-PLAN.md](../MOBILE-PLAN.md) 第 4 节。
 

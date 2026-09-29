@@ -40,7 +40,7 @@ Sources/DeepSeekMeter/           App sources (SwiftUI + AppKit)
   PlatformService.swift          DeepSeek platform API client
   Models.swift                   Decodable models + aggregation
   SettingsStore.swift            UserDefaults persistence + launch-at-login
-windows/                         Windows version (.NET 8 + WPF, feature-aligned with the macOS app)
+windows/                         Windows version (.NET 8 + WPF, same platform API contract as the macOS app; see the README capability matrix for per-platform differences)
   src/DeepSeekMeter.Core/        Pure-logic library (Models / Formatting / PlatformService / SettingsStore)
   src/DeepSeekMeter/             WPF app (MainViewModel / TrayIconController / PopoverWindow / LoginWindow)
   tests/DeepSeekMeter.Selftest/  Lightweight self-tests (console, no test framework)

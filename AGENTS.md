@@ -73,7 +73,7 @@ Sources/DeepSeekMeter/
   Views/
     PopoverView.swift            悬浮窗主界面（SwiftUI）
     SparklineView.swift          Token 按天用量柱状图
-windows/                         Windows 版（.NET 8 + WPF，与 macOS 版功能对齐）
+windows/                         Windows 版（.NET 8 + WPF，与 macOS 版共用同一套平台接口契约；能力差异见 README 平台能力矩阵）
   src/DeepSeekMeter.Core/        纯逻辑库（PlatformService / Models / Formatting / SettingsStore / UpdateService / TokenProtector 等，零第三方依赖）
   src/DeepSeekMeter/             WPF 应用：MainViewModel / TrayIconController / PopoverWindow / LoginWindow 等
   tests/DeepSeekMeter.Selftest/  轻量自测（控制台，零测试框架）
@@ -191,6 +191,7 @@ Foundation / AppKit / SwiftUI / WebKit
 - [ ] Android 改动：`cd android && ./gradlew :core:test :app:assembleDebug` 通过
 - [ ] Windows 改动：`dotnet build windows/DeepSeekMeter.sln -c Release` 与 `DeepSeekMeter.Selftest` 通过
 - [ ] 新增纯逻辑已补自测
+- [ ] 新功能已同步到其它端，或在 README 功能矩阵中如实标注（未同步的项写明计划）
 - [ ] 未触碰第 8 节任何红线
 - [ ] 提交信息符合第 5 节规范，小步提交
 - [ ] PR 描述完整、按模板勾选；CI 全绿
