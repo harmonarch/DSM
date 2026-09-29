@@ -29,6 +29,11 @@ public partial class App : System.Windows.Application
         _singleInstanceMutex = new Mutex(true, @"Local\DeepSeekMeter", out var createdNew);
         if (!createdNew)
         {
+            // 命名互斥体已存在：CreateMutex 会忽略 bInitialOwner，本进程并未取得所有权。
+            // 立即释放该句柄并清空字段，保证 OnExit 不会对非持有者调用 ReleaseMutex（会抛 ApplicationException）。
+            _singleInstanceMutex.Dispose();
+            _singleInstanceMutex = null;
+
             try { ShowSignal.Set(); } catch { /* 忽略 */ }
             Shutdown();
             return;
@@ -174,6 +179,8 @@ public partial class App : System.Windows.Application
         _model?.StopPolling();
         _tray?.Dispose();
         _tray = null;
+        // 不变量：只有创建命名互斥体的实例才持有它，非持有者调用 ReleaseMutex 会抛 ApplicationException。
+        // 二次启动的实例已在 OnStartup 中释放句柄并把字段置空，故这里的 ?. 会安全跳过。
         _singleInstanceMutex?.ReleaseMutex();
         _singleInstanceMutex?.Dispose();
         _singleInstanceMutex = null;
