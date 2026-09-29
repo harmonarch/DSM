@@ -118,7 +118,7 @@ struct HomeView: View {
                     .padding(.vertical, 4)
                     .background(.white.opacity(0.22), in: Capsule())
             }
-            Text("\(currencySymbol(appModel.currency)) \(format(appModel.lastBalance?.total ?? 0))")
+            Text(appModel.lastBalance.map { "\(currencySymbol(appModel.currency)) \(format($0.total))" } ?? "—")
                 .font(.system(size: 46, weight: .bold, design: .rounded))
                 .monospacedDigit()
                 .contentTransition(.numericText())
@@ -136,25 +136,27 @@ struct HomeView: View {
         .shadow(color: heroGradientShadow, radius: 14, x: 0, y: 8)
     }
 
-    /// 余额阈值配色：低于 1 红、低于 10 橙（对齐桌面菜单栏语义）
+    /// 余额阈值配色：低于 1 红、低于 10 橙（对齐桌面菜单栏语义）；余额未知时保持品牌蓝，不做报警
     private var heroGradient: LinearGradient {
-        let value = appModel.lastBalance?.total ?? 0
-        if value < 1 {
-            return LinearGradient(colors: [Color(red: 0.85, green: 0.30, blue: 0.22), Color(red: 0.55, green: 0.08, blue: 0.12)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
-        }
-        if value < 10 {
-            return LinearGradient(colors: [Color(red: 0.98, green: 0.62, blue: 0.20), Color(red: 0.82, green: 0.32, blue: 0.05)],
-                                  startPoint: .topLeading, endPoint: .bottomTrailing)
+        if let value = appModel.lastBalance?.total {
+            if value < 1 {
+                return LinearGradient(colors: [Color(red: 0.85, green: 0.30, blue: 0.22), Color(red: 0.55, green: 0.08, blue: 0.12)],
+                                      startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            if value < 10 {
+                return LinearGradient(colors: [Color(red: 0.98, green: 0.62, blue: 0.20), Color(red: 0.82, green: 0.32, blue: 0.05)],
+                                      startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
         }
         return LinearGradient(colors: [Color(red: 0.16, green: 0.42, blue: 0.98), Color(red: 0.05, green: 0.18, blue: 0.55)],
                               startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 
     private var heroGradientShadow: Color {
-        let value = appModel.lastBalance?.total ?? 0
-        if value < 1 { return Color.red.opacity(0.4) }
-        if value < 10 { return Color.orange.opacity(0.4) }
+        if let value = appModel.lastBalance?.total {
+            if value < 1 { return Color.red.opacity(0.4) }
+            if value < 10 { return Color.orange.opacity(0.4) }
+        }
         return Color(red: 0.16, green: 0.42, blue: 0.98).opacity(0.4)
     }
 
@@ -173,7 +175,7 @@ struct HomeView: View {
 
     /// 续航读数行：白色读数在左、细余量条在右——对应 Android 表盘中心的「预计可用 N 天」
     private var runwayLine: some View {
-        let readout = runwayReadout(balance: appModel.lastBalance?.total ?? 0, usage: appModel.monthUsage)
+        let readout = runwayReadout(balance: appModel.lastBalance?.total, usage: appModel.monthUsage)
         return HStack(spacing: 8) {
             Text(readout.label)
                 .font(.footnote.weight(.semibold))

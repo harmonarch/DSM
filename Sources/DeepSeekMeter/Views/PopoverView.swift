@@ -167,10 +167,13 @@ struct PopoverView: View {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .firstTextBaseline, spacing: 4) {
-                        Text(currencySymbol(balance?.currency ?? "CNY"))
-                            .font(.title3.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Text(format(balance?.total ?? 0))
+                        // 余额未知（冷启动 / 离线 / 接口失败）时不显示币种与数字，只留中性占位「—」
+                        if let balance {
+                            Text(currencySymbol(balance.currency))
+                                .font(.title3.weight(.medium))
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(balance.map { format($0.total) } ?? "—")
                             .font(.system(size: 32, weight: .bold, design: .rounded))
                             .monospacedDigit()
                             .contentTransition(.numericText())
@@ -249,7 +252,7 @@ struct PopoverView: View {
 
     /// 续航读数行：文字读数在左、细余量条在右——油表的平面化，容量一眼可读
     private var runwayRow: some View {
-        let readout = runwayReadout(balance: balance?.total ?? 0, usage: model.monthUsage)
+        let readout = runwayReadout(balance: balance?.total, usage: model.monthUsage)
         return HStack(spacing: 8) {
             Text(readout.label)
                 .font(.caption.weight(.medium))

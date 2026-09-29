@@ -361,9 +361,12 @@ extension MonthUsage {
     }
 }
 
-/// 由余额 + 本月用量推出续航读数（纯函数，可测；usage 传 nil 表示用量数据未就绪）
-public func runwayReadout(balance: Double, usage: MonthUsage?, on date: Date = Date()) -> RunwayReadout {
-    guard let usage else {
+/// 由余额 + 本月用量推出续航读数（纯函数，可测）。
+/// balance 传 nil 表示余额未知（冷启动 / 离线 / 余额接口失败），usage 传 nil 表示用量数据未就绪：
+/// 两者任一未知都返回中性 unknown 读数（「预计可用 —」，ratio 归 0），绝不臆断「余额已耗尽」；
+/// balance 非 nil 时行为不变（0 仍判「余额已耗尽」）。
+public func runwayReadout(balance: Double?, usage: MonthUsage?, on date: Date = Date()) -> RunwayReadout {
+    guard let balance, let usage else {
         // ratio 归 0 + unknown：UI 以中性样式渲染余量条（不模拟「满格」避免误读）
         return RunwayReadout(label: "预计可用 —", ratio: 0, level: .unknown)
     }

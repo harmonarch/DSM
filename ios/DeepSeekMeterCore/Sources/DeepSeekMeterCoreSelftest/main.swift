@@ -320,6 +320,10 @@ do {
     // 四态读数（8/5 的日均 = 3 元）
     check(runwayReadout(balance: 9, usage: nil, on: runwayBjDate(2026, 8, 5)).level == .unknown, "用量未就绪：中性「预计可用 —」")
     check(runwayReadout(balance: 0, usage: runwayUsage, on: runwayBjDate(2026, 8, 5)).label == "余额已耗尽", "余额 0：耗尽判定优先于无消耗")
+    // 余额未知（冷启动 / 离线 / 余额接口失败）：中性「预计可用 —」，绝不臆断「余额已耗尽」
+    let runwayNoBalance = runwayReadout(balance: nil, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
+    check(runwayNoBalance.label == "预计可用 —" && runwayNoBalance.ratio == 0 && runwayNoBalance.level == .unknown, "余额未知：中性「预计可用 —」，不报耗尽")
+    check(runwayReadout(balance: nil, usage: nil, on: runwayBjDate(2026, 8, 5)).level == .unknown, "余额与用量都未就绪：仍是中性 unknown")
     check(runwayReadout(balance: 9, usage: runwayUsage, on: runwayBjDate(2026, 8, 20)).label == "近期无消耗", "近 7 日无消耗：满格中性")
     let runway10 = runwayReadout(balance: 30, usage: runwayUsage, on: runwayBjDate(2026, 8, 5))
     check(runway10.label == "预计可用 10 天" && abs(runway10.ratio - 1.0 / 3.0) < 0.001 && runway10.level == .healthy, "余额 30 日均 3：预计可用 10 天（占比 1/3）")
