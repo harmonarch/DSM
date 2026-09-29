@@ -84,9 +84,16 @@ class UpdateManager(private val context: Context) {
                     return@Thread
                 }
                 state = UpdateState.Downloading(0f)
+                // 不变式：清理必须在下载之前完成。downloadApk 写入的就是暂存目录
+                // （cacheDir/update），旧实现在下载之后调用清理，会把刚校验通过的新包一并删掉，
+                // 导致 stagedApk 指向不存在的文件，安装必然抛 FileNotFoundException。
+                cleanupStagedApk()
                 val apk = downloadApk(release)
                 verifyChecksum(apk, release.sumsUrl)
-                cleanupStagedApk()
+                // 不变式：进入 ReadyToInstall 前文件必须真实存在，否则宁可失败也不要给出点不动的安装按钮。
+                if (!apk.isFile) {
+                    throw RuntimeException("安装包已丢失（${apk.name}），请重试或重新检查更新")
+                }
                 stagedApk = apk
                 state = UpdateState.ReadyToInstall(apk, release.version)
             } catch (e: Exception) {
@@ -287,9 +294,22 @@ class UpdateManager(private val context: Context) {
         return confirm?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     }
 
+    /**
+     * 清理上一份已暂存的安装包。
+     *
+     * 不变式：暂存的 APK 必须一直存活到安装结果确定为止（安装失败时保留，供「重新安装」直接重试），
+     * 而清理只允许作用于本类自己暂存的那一个文件——先删除该文件本身，再在目录恰好为空时
+     * 顺手删掉空目录。绝不能 deleteRecursively()：cacheDir/update 是与下载共用的目录，
+     * 递归删除会连带删掉别人的（尤其是刚下载好的新包）。
+     *
+     * 幂等；[stagedApk] 为 null 时安全无副作用。
+     */
     private fun cleanupStagedApk() {
-        stagedApk?.parentFile?.let { dir -> runCatching { dir.deleteRecursively() } }
+        val apk = stagedApk ?: return
         stagedApk = null
+        runCatching { apk.delete() }
+        // best-effort：仅当目录已空时才删，非空说明还有别的文件（例如新下载的包），保持原样
+        runCatching { apk.parentFile?.takeIf { it.listFiles()?.isEmpty() == true }?.delete() }
     }
 
     companion object {
