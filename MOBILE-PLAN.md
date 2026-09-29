@@ -93,10 +93,13 @@ ios/
 | PlatformService.swift | PlatformService.swift | **照搬**：URLSession、User-Agent/Referer/Origin/Authorization 头、15s 超时、错误归一化为 PlatformError（中文 message）。仅将 URLSession.shared 换成可注入的 URLSession（便于测试） |
 | Models.swift | Models.swift | **照搬**：Envelope/BizWrapper 解包、APIKeyAmount/Cost 模型、MonthUsage.aggregated()（UTC+8 平台时区口径）、DataStatus 判定 |
 | Formatting.swift | Formatting.swift | **照搬**：format() / currencySymbol() |
+| WAFGuard.swift | WAFGuard.swift | **照搬**：平台前置风控（AWS WAF）适配：挑战判定 + 浏览器票据组装（纯函数） |
 | AppModel.swift | AppModel.swift | **移植 + 注入化**：UI 逻辑收进核心包；注入 TokenStoring 与 PlatformService（URLSession 可注入），状态机可在 macOS 上跑自测（selftest 第 12 节） |
 | （新增） | TokenStoring.swift | protocol TokenStore { load/save/clear }，核心不依赖 Keychain；iOS 用 Keychain、自测用内存实现 |
 
 > 与 windows/ 的做法区别：Windows 是**另一种语言必须重写**；iOS 与 macOS 同语言，核心直接复制 + 微调，用自测保证两份核心行为一致。后续若做 D4（macOS 引用同一核心包），漂移风险自然消除。
+
+> **漂移守卫（红线 13）**：`Scripts/check-core-drift.sh` **双向**比对上表 5 个逐文件对应文件（`AppModel.swift` / `Formatting.swift` / `Models.swift` / `PlatformService.swift` / `WAFGuard.swift`）与 `ios/DeepSeekMeterCore/CORE_FINGERPRINT` 记录的两侧哈希——仅 macOS 侧改动会提示同步移植到 `ios/DeepSeekMeterCore`，仅 iOS 侧改动会提示确认是否回移 macOS，两侧都改则提示核对两实现语义一致；任一不匹配都以非零退出（CI 拦截）。`TokenStoring.swift` / `BalanceSnapshot.swift` 为 iOS 专有，macOS 专有文件不参与比对；但两侧若新增同名核心文件却未纳入脚本清单、或清单内文件在某一侧缺失/改名，脚本会直接失败而不是静默跳过。改动确认后由 `bash Scripts/fingerprint-core.sh` 重新生成两侧指纹。
 
 ### 3.4 登录与 Token 存储（移动端关键差异）
 

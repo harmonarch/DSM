@@ -28,7 +28,7 @@ bash Scripts/install.sh          # 构建 + 安装到 /Applications 并启动
 # iOS 版验证（核心包自测 + 工程结构静态校验必跑；有 Xcode 时还会构建 App 冒烟）
 bash Scripts/run-ios-tests.sh
 python3 Scripts/check-ios-project.py   # 单独跑工程结构校验（无 Xcode 环境的把关）
-bash Scripts/check-core-drift.sh       # 校验 macOS 核心文件与 iOS 核心包未漂移
+bash Scripts/check-core-drift.sh       # 双向校验 macOS / iOS 两侧核心文件未漂移（任一侧改动都会被拦截）
 
 # 本机有 Xcode 后：一键跑 iOS 模拟器（构建 + 运行 + 截图），详见 docs/install-xcode-and-run.md
 bash Scripts/run-ios-simulator.sh
@@ -46,7 +46,7 @@ CI（`.github/workflows/ci.yml`）由 5 个平行 job 组成：**改动涉及哪
 - version-sync：`check-version-sync.sh` 校验 macOS / Windows / Android / iOS 四端版本号一致，不一致直接失败
 - macOS：`swift build` → `swift build -c release` → `run-tests.sh` → `build-app.sh release` → 冒烟启动 6 秒
 - Windows：`dotnet build windows/DeepSeekMeter.sln -c Release` → `DeepSeekMeter.Selftest` → 冒烟启动 6 秒
-- iOS：`check-core-drift.sh` → 核心包自测 → `check-ios-project.py` → 无签名模拟器构建
+- iOS：`check-core-drift.sh`（两侧核心文件双向漂移校验）→ 核心包自测 → `check-ios-project.py` → 无签名模拟器构建
 - Android：`./gradlew :core:test :app:assembleDebug`
 
 只改文档或脚本时，至少跑与受影响端对应的命令。
@@ -93,8 +93,8 @@ Scripts/
   build-app.sh / install.sh / notarize.sh / run-tests.sh / run-ios-tests.sh / run-ios-simulator.sh
   bump-version.sh                一处更新四端版本号（发版用，结尾自动校验一致性）
   check-version-sync.sh          校验四端版本号一致（CI version-sync job 调用）
-  check-core-drift.sh            校验 macOS 核心文件与 iOS 核心包未漂移（红线 13 的执行者，CI 调用）
-  fingerprint-core.sh            核心文件改动后更新 CORE_FINGERPRINT
+  check-core-drift.sh            双向校验 macOS / iOS 两侧核心文件未漂移（红线 13 的执行者，CI 调用）
+  fingerprint-core.sh            确认两侧一致后更新 CORE_FINGERPRINT（逐文件记录两侧哈希，各一行）
   check-ios-project.py           无 Xcode 环境的 iOS 工程结构静态校验（CI 调用）
   make-icon.sh / generate-icon.swift / make-windows-icon.ps1 / generate-android-icon.swift
   publish-windows.ps1            Windows 发布辅助
@@ -179,14 +179,14 @@ Foundation / AppKit / SwiftUI / WebKit
 
 11. **（iOS / Android）移动端同样零第三方依赖**：iOS/Android 业务逻辑零第三方依赖；系统框架（URLSession / SwiftUI / WebKit / Security / WidgetKit，以及 Android 的 Compose / HttpURLConnection / WorkManager 等）与平台官方工具不视为第三方（与 Windows 版 WebView2 例外同理）。其中 WorkManager 为 androidx 官方后台调度库，准入已经过 Issue 讨论（红线 1，见 [Issue #11](https://github.com/pppolf/DeepSeekMeter/issues/11)），仅用于 `:app` 层后台刷新，`:core` 保持零 AndroidX 依赖；其他 androidx 库（如 Room / DataStore）不因本条目自动豁免，引入前同样需按红线 1 单独开 Issue 讨论
 12. **（iOS / Android）Token 存储分平台**：红线 2 仅约束 macOS；**iOS 用 Keychain（kSecClassGenericPassword）、Android 用 Keystore 加密后存 SharedPreferences**——移动端 App 有正式签名，钥匙串不会弹窗；同样不得把真实 Token 写进代码/日志/截图。**小组件快照**（App Group UserDefaults）只放余额等非敏感展示数据，不放 Token
-13. **（iOS / Android）移动端核心逻辑统一在 `ios/DeepSeekMeterCore`**（Swift 5 语言模式，与 Sources/DeepSeekMeter/ 逐文件对应，防三端漂移）；改动任一侧核心文件（PlatformService / Models / Formatting / WAFGuard）后，必须跑 `bash Scripts/fingerprint-core.sh` 更新 `CORE_FINGERPRINT` 并跑核心自测（第 2 节命令），CI 用 `Scripts/check-core-drift.sh` 拦截漏同步；`.xcodeproj` 只允许存在于 `ios/` 内，macOS 包保持无 Xcode 工程；新接口改动前先抓真实响应验证并同步更新自测样例 JSON（红线 4 同样适用）
+13. **（iOS / Android）移动端核心逻辑统一在 `ios/DeepSeekMeterCore`**（Swift 5 语言模式，与 Sources/DeepSeekMeter/ 逐文件对应，防三端漂移）；逐文件对应的核心文件是 **AppModel / Formatting / Models / PlatformService / WAFGuard**（iOS 专有的 TokenStoring / BalanceSnapshot、macOS 专有的 SettingsStore / UpdateService 等不在此列）；**任一侧**改动这些文件后都必须确认另一侧跟上（macOS 改动 → 同步移植到 `ios/DeepSeekMeterCore`；iOS 改动 → 确认是否回移 macOS），再跑 `bash Scripts/fingerprint-core.sh` 更新 `CORE_FINGERPRINT`（逐文件记录两侧哈希）并跑核心自测（第 2 节命令），CI 用 `Scripts/check-core-drift.sh` 双向拦截漏同步——两侧新增同名核心文件却未纳入清单、或清单内文件在某一侧缺失/改名时，校验直接失败而不是静默跳过；`.xcodeproj` 只允许存在于 `ios/` 内，macOS 包保持无 Xcode 工程；新接口改动前先抓真实响应验证并同步更新自测样例 JSON（红线 4 同样适用）
 
 ## 9. 完成标准（Definition of Done）
 
 按「改动涉及哪一端」勾选（与 .github/pull_request_template.md 一致）：
 
 - [ ] macOS 改动：`swift build` / `swift build -c release` / `bash Scripts/run-tests.sh` / `bash Scripts/build-app.sh release` 均通过
-- [ ] 核心逻辑改动（PlatformService / Models / Formatting / WAFGuard）：`bash Scripts/fingerprint-core.sh` 已更新指纹，`check-core-drift.sh` 通过
+- [ ] 核心逻辑改动（逐文件对应，两侧任一侧：AppModel / Formatting / Models / PlatformService / WAFGuard）：已确认另一侧同步，`bash Scripts/fingerprint-core.sh` 已更新两侧指纹，`check-core-drift.sh` 通过
 - [ ] iOS 改动：`bash Scripts/run-ios-tests.sh` 通过（内含核心漂移校验与 `check-ios-project.py` 工程结构校验）
 - [ ] Android 改动：`cd android && ./gradlew :core:test :app:assembleDebug` 通过
 - [ ] Windows 改动：`dotnet build windows/DeepSeekMeter.sln -c Release` 与 `DeepSeekMeter.Selftest` 通过
