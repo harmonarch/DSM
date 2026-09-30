@@ -267,12 +267,12 @@ struct HomeView: View {
         }
     }
 
-    // MARK: - Token 用量趋势
+    // MARK: - Token 用量趋势（近 30 天，可跨月）
 
     private var trendSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
-                Text("Token 用量趋势")
+                Text("Token 用量趋势（近 30 天）")
                     .font(.headline)
                 Spacer()
                 Picker("", selection: $trendMetric) {
@@ -285,17 +285,17 @@ struct HomeView: View {
                 .frame(width: 220)
             }
 
-            if let usage = appModel.monthUsage {
-                let entries = tokenDailyEntries(usage: usage, metric: trendMetric)
+            if !appModel.trendDays.isEmpty {
+                let entries = tokenDailyEntries(appModel.trendDays, metric: trendMetric)
                 if entries.isEmpty {
-                    Text("本月暂无用量数据")
+                    Text("近 30 天暂无用量数据")
                         .font(.footnote)
                         .foregroundStyle(.tertiary)
                 } else {
                     TokenDailyChart(entries: entries)
                         .frame(height: 130)
                     HStack(spacing: 4) {
-                        Text("今日 \(Self.tokenString(dailyValue(usage: usage, on: Date(), metric: trendMetric)))")
+                        Text("今日 \(Self.tokenString(todayValue(appModel.trendDays, metric: trendMetric)))")
                         Spacer()
                         if let peak = entries.max(by: { $0.value < $1.value }) {
                             Text("峰值 \(Self.tokenString(peak.value))（\(Self.dayLabel(peak.date))）")
@@ -456,33 +456,23 @@ struct HomeView: View {
     }
 
     private static func dayLabel(_ date: Date) -> String {
-        let cal = Calendar.current
+        let cal = MonthUsage.platformCalendar
         return "\(cal.component(.month, from: date))月\(cal.component(.day, from: date))日"
     }
 
-    private func tokenDailyEntries(usage: MonthUsage, metric: TrendMetric) -> [TokenDailyEntry] {
-        let todayKey = MonthUsage.dayFormatter.string(from: Date())
-        return usage.amountDays.compactMap { day -> TokenDailyEntry? in
-            guard day.date <= todayKey, let date = MonthUsage.dayFormatter.date(from: day.date) else { return nil }
-            return TokenDailyEntry(date: date, value: dailyValue(day: day, metric: metric))
+    /// 趋势图条目：按平台时区（北京时间）解析日期，保证「一根柱 = 一天」且标签日与平台口径一致
+    private func tokenDailyEntries(_ days: [TrendDay], metric: TrendMetric) -> [TokenDailyEntry] {
+        days.compactMap { day -> TokenDailyEntry? in
+            guard let date = MonthUsage.dayFormatter.date(from: day.date) else { return nil }
+            return TokenDailyEntry(date: date, value: metric.value(of: day))
         }
     }
 
-    private func dailyValue(usage: MonthUsage, on date: Date, metric: TrendMetric) -> Double {
-        let key = MonthUsage.dayFormatter.string(from: date)
-        guard let day = usage.amountDays.first(where: { $0.date == key }) else { return 0 }
-        return dailyValue(day: day, metric: metric)
-    }
-
-    private func dailyValue(day: UsageDay, metric: TrendMetric) -> Double {
-        let resp = day.data.reduce(0) { $0 + $1.value(for: "RESPONSE_TOKEN") }
-        let hit = day.data.reduce(0) { $0 + $1.value(for: "PROMPT_CACHE_HIT_TOKEN") }
-        let miss = day.data.reduce(0) { $0 + $1.value(for: "PROMPT_CACHE_MISS_TOKEN") }
-        switch metric {
-        case .output: return resp
-        case .cacheHit: return hit
-        case .total: return resp + hit + miss
-        }
+    /// 今日读数：按平台时区取今天的 key，与趋势柱同口径
+    private func todayValue(_ days: [TrendDay], metric: TrendMetric) -> Double {
+        let key = MonthUsage.dayFormatter.string(from: Date())
+        guard let day = days.first(where: { $0.date == key }) else { return 0 }
+        return metric.value(of: day)
     }
 }
 
