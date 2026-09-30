@@ -13,6 +13,8 @@ final class AppModel: ObservableObject {
     @Published var lastError: String?
 
     @Published var monthUsage: MonthUsage?
+    /// 近 30 天按天 Token 趋势（趋势图专用，可跨月；与 monthUsage 是两个不同窗口）
+    @Published var trendDays: [TrendDay] = []
     /// 本月按 API Key 拆分的用量（与 monthUsage 同一次拉取、同一窗口）
     @Published var apiKeyUsages: [APIKeyUsage] = []
     @Published var usageError: String?
@@ -95,6 +97,7 @@ final class AppModel: ObservableObject {
 
         await fetchBalance()
         await fetchUsage()
+        await fetchTrend()
         await fetchServiceHealthIfDue()
     }
 
@@ -199,6 +202,33 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// 趋势：近 30 天按天 Token（可跨月）。
+    /// 与 fetchUsage 的「本月」窗口刻意分开：月初时本月只有 1 天数据，趋势图会退化成一根占满全宽的柱子。
+    /// 滚动窗口固定 30 天，不超过平台 by_api_key 按天分桶的 31 桶上限（见 MonthUsage.trendDayCount）。
+    private func fetchTrend() async {
+        guard !settings.platformToken.isEmpty else {
+            trendDays = []
+            return
+        }
+        do {
+            let range = MonthUsage.rollingDayRange()
+            let data = try await platformService.fetchAPIKeyAmount(
+                token: settings.platformToken,
+                start: range.startTs,
+                end: range.endTs,
+                tz: range.tzSeconds
+            )
+            trendDays = trendSeries(
+                startTs: range.startTs,
+                endTs: range.endTs,
+                tzSeconds: range.tzSeconds,
+                amountData: data
+            )
+        } catch {
+            // 趋势是辅助视图：失败保留上一份，仅由 usageError 提示（不新增错误通道，避免重复报错）
+        }
+    }
+
     /// 服务健康度：读 DeepSeek 官方状态页（无需 Token，登录与否都拉），按最小间隔节流
     private func fetchServiceHealthIfDue() async {
         if let last = lastStatusFetch, Date().timeIntervalSince(last) < Self.statusFetchMinInterval {
@@ -250,6 +280,7 @@ final class AppModel: ObservableObject {
             platformTokenExpired = false
             await fetchUsage()
             await fetchBalance()
+            await fetchTrend()
             return usageError == nil && lastError == nil
         } catch {
             usageError = (error as? PlatformError)?.message ?? error.localizedDescription
@@ -263,6 +294,7 @@ final class AppModel: ObservableObject {
     func clearPlatformToken() {
         settings.clearPlatformToken()
         monthUsage = nil
+        trendDays = []
         apiKeyUsages = []
         usageError = nil
         lastBalance = nil

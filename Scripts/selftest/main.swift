@@ -502,6 +502,45 @@ check(lowBalanceDecision(balance: 5, threshold: 1, alerted: true) == LowBalanceD
 check(lowBalanceDecision(balance: 0.5, threshold: 1, alerted: false) == LowBalanceDecision(shouldNotify: true, alerted: true), "低余额：首次跌破阈值通知并置位")
 check(lowBalanceDecision(balance: 0.5, threshold: 1, alerted: true) == LowBalanceDecision(shouldNotify: false, alerted: true), "低余额：同一周期不重复通知")
 
+// 18. 滚动 30 天趋势窗口与按天聚合（趋势图不再用「本月」：月初本月只有 1 天数据，图会退化成一根满宽柱）
+let trendBase = MonthUsage.platformCalendar.date(
+    from: DateComponents(year: 2026, month: 10, day: 1, hour: 3, minute: 42))!
+let trendRange = MonthUsage.rollingDayRange(on: trendBase)
+// 2026-09-02 00:00 北京 = 1788278400；2026-10-01 00:00 北京 = 1790784000；10-02 00:00 = 1790870400
+check(trendRange.startTs == 1788278400, "趋势窗口：起点为 29 天前的北京 00:00（2026-09-02）")
+check(trendRange.endTs == 1790870400, "趋势窗口：终点为明天北京 00:00（左闭右开，含今天）")
+check(trendRange.tzSeconds == 28800, "趋势窗口：分桶时区为北京时间")
+check((trendRange.endTs - trendRange.startTs) / 86400 == 30, "趋势窗口：整 30 天")
+// 不超过平台 by_api_key 按天分桶的 31 桶上限（实测超过 31 天会被平台以 biz_code=1 INVALID_PARAM 拒绝）
+check(MonthUsage.trendDayCount <= 31, "趋势窗口天数不超过平台 31 桶上限")
+check(MonthUsage.dayFormatter.string(from: Date(timeIntervalSince1970: Double(trendRange.startTs))) == "2026-09-02",
+      "趋势窗口：月初时窗口跨到上月（不再是本月 1 号那一天）")
+let trendAmountJSON = """
+{"code":0,"msg":"","data":{"biz_code":0,"biz_msg":"","biz_data":{"start":1788278400,"end":1790870400,"bucket":86400,"models":["deepseek-v4-pro"],"series":[{"api_key":{"tracking_id":"test-tracking","name":"test-key","sensitive_id":"sk-xxx","valid":true},"model":"deepseek-v4-pro","buckets":[{"time":1790697600,"usage":{"REQUEST":4,"RESPONSE_TOKEN":10,"PROMPT_CACHE_HIT_TOKEN":100,"PROMPT_CACHE_MISS_TOKEN":5}},{"time":1790784000,"usage":{"REQUEST":9,"RESPONSE_TOKEN":20,"PROMPT_CACHE_HIT_TOKEN":200,"PROMPT_CACHE_MISS_TOKEN":7}},{"time":1790870400,"usage":{"REQUEST":99,"RESPONSE_TOKEN":99}}]}]}}}
+"""
+do {
+    struct TrendBiz: Decodable { let bizCode: Int; let bizMsg: String; let bizData: APIKeyAmountData }
+    struct TrendResp: Decodable { let code: Int; let data: TrendBiz? }
+    let trendDecoder = JSONDecoder()
+    trendDecoder.keyDecodingStrategy = .convertFromSnakeCase
+    let amount = try trendDecoder.decode(TrendResp.self, from: Data(trendAmountJSON.utf8)).data?.bizData
+    let series = trendSeries(startTs: trendRange.startTs, endTs: trendRange.endTs,
+                             tzSeconds: trendRange.tzSeconds, amountData: amount)
+    check(series.count == 2, "趋势聚合：只保留窗口内的天（10/2 的桶被忽略）")
+    check(series.map(\.date) == ["2026-09-30", "2026-10-01"], "趋势聚合：按日期升序且跨月连续")
+    check(abs((series.first?.totalTokens ?? 0) - 115) < 0.001, "趋势聚合：9/30 总量 = 10+100+5")
+    check(abs((series.last?.totalTokens ?? 0) - 227) < 0.001, "趋势聚合：10/1 总量 = 20+200+7")
+    check(abs((series.last?.responseTokens ?? 0) - 20) < 0.001, "趋势聚合：输出维度单独可取")
+    check(abs((series.last?.cacheHitTokens ?? 0) - 200) < 0.001, "趋势聚合：缓存命中维度单独可取")
+    check(trendSeries(startTs: trendRange.startTs, endTs: trendRange.endTs,
+                      tzSeconds: trendRange.tzSeconds, amountData: nil).isEmpty, "趋势聚合：无数据返回空数组")
+    // 平台会对窗口补齐空桶：窗口以「明天 00:00」为终点，未来日期不会入图
+    let futureKey = MonthUsage.dayFormatter.string(from: Date(timeIntervalSince1970: Double(trendRange.endTs)))
+    check(!series.contains { $0.date >= futureKey }, "趋势聚合：窗口外的未来日期不入图")
+} catch {
+    check(false, "趋势聚合解码抛错：\(error)")
+}
+
 if failures > 0 {
     print("\n❌ \(failures) 项未通过")
     exit(1)

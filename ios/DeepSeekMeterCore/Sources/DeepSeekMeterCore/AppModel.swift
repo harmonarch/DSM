@@ -14,6 +14,8 @@ public final class AppModel: ObservableObject {
     @Published public var lastError: String?
 
     @Published public var monthUsage: MonthUsage?
+    /// 近 30 天按天 Token 趋势（趋势图专用，可跨月；与 monthUsage 是两个不同窗口）
+    @Published public var trendDays: [TrendDay] = []
     @Published public var usageError: String?
     @Published public var platformTokenExpired = false
 
@@ -101,6 +103,7 @@ public final class AppModel: ObservableObject {
 
         await fetchBalance()
         await fetchUsage()
+        await fetchTrend()
     }
 
     // MARK: - 拉取
@@ -184,6 +187,33 @@ public final class AppModel: ObservableObject {
         }
     }
 
+    /// 趋势：近 30 天按天 Token（可跨月）。
+    /// 与 fetchUsage 的「本月」窗口刻意分开：月初时本月只有 1 天数据，趋势图会退化成一根占满全宽的柱子。
+    /// 滚动窗口固定 30 天，不超过平台 by_api_key 按天分桶的 31 桶上限（见 MonthUsage.trendDayCount）。
+    private func fetchTrend() async {
+        guard let token, !token.isEmpty else {
+            trendDays = []
+            return
+        }
+        do {
+            let range = MonthUsage.rollingDayRange()
+            let data = try await platformService.fetchAPIKeyAmount(
+                token: token,
+                start: range.startTs,
+                end: range.endTs,
+                tz: range.tzSeconds
+            )
+            trendDays = trendSeries(
+                startTs: range.startTs,
+                endTs: range.endTs,
+                tzSeconds: range.tzSeconds,
+                amountData: data
+            )
+        } catch {
+            // 趋势是辅助视图：失败保留上一份，仅由 usageError 提示（不新增错误通道，避免重复报错）
+        }
+    }
+
     // MARK: - 登录
 
     /// 保存新的平台 Token 并立即校验；返回是否成功（登录页 WebView 提取到候选后调用）
@@ -205,6 +235,7 @@ public final class AppModel: ObservableObject {
             platformTokenExpired = false
             await fetchUsage()
             await fetchBalance()
+            await fetchTrend()
             return usageError == nil && lastError == nil
         } catch {
             usageError = (error as? PlatformError)?.message ?? error.localizedDescription
@@ -220,6 +251,7 @@ public final class AppModel: ObservableObject {
         tokenStore.clearToken()
         token = nil
         monthUsage = nil
+        trendDays = []
         usageError = nil
         lastBalance = nil
         lastError = nil

@@ -226,6 +226,30 @@ public struct MonthUsage: Identifiable {
         return formatter
     }()
 
+    // MARK: - 滚动窗口（趋势图用）
+
+    /// 平台 by_api_key 接口按天分桶时最多接受 31 个桶：
+    /// 请求窗口超过 31 天会被平台以 biz_code=1 + INVALID_PARAM 拒绝（真实响应验证，见 selftest）。
+    /// 趋势窗口取 30 天，留出一天余量。
+    public static let trendDayCount = 30
+
+    /// 近 N 天（含 today 当天）的查询窗口与分桶时区。
+    /// 与「本月」口径不同：月初时本月只有 1 天数据，趋势图会退化成一根占满全宽的柱子，
+    /// 滚动窗口始终给出完整的 N 天历史（可跨月），因此趋势图用它取数。
+    /// - Parameters:
+    ///   - dayCount: 天数（含 today），不得为 0；调用方需保证 ≤ 31（见 trendDayCount 说明）
+    ///   - date: 基准日（默认当前时间），按平台时区（北京时间）取当天 00:00
+    /// - Returns: startTs/endTs 为 Unix 秒（endTs 为「今天之后一天」00:00，左闭右开）、tzSeconds 为桶时区偏移
+    public static func rollingDayRange(dayCount: Int = trendDayCount, on date: Date = Date())
+        -> (startTs: Int, endTs: Int, tzSeconds: Int) {
+        let count = max(1, dayCount)
+        let today = platformCalendar.startOfDay(for: date)
+        let start = platformCalendar.date(byAdding: .day, value: -(count - 1), to: today) ?? today
+        let end = platformCalendar.date(byAdding: .day, value: 1, to: today) ?? today
+        return (Int(start.timeIntervalSince1970), Int(end.timeIntervalSince1970),
+                platformTimeZone.secondsFromGMT())
+    }
+
     // MARK: - by_api_key 序列聚合
 
     /// 把 by_api_key 的天桶序列聚合成 MonthUsage。
@@ -311,6 +335,65 @@ public struct MonthUsage: Identifiable {
             costModels: costModels,
             costDays: costDays,
             amountDays: amountDays
+        )
+    }
+}
+
+// MARK: - 滚动 N 天 Token 趋势（趋势图专用，可跨月）
+
+/// 趋势图的一天：date 为平台时区的 yyyy-MM-dd，三个 token 维度按天合计
+public struct TrendDay: Equatable, Identifiable {
+    public let date: String
+    public let responseTokens: Double
+    public let cacheHitTokens: Double
+    public let cacheMissTokens: Double
+
+    public var id: String { date }
+
+    /// 总量 = 输出 + 缓存命中 + 缓存未命中（与图表「总量」口径一致）
+    public var totalTokens: Double { responseTokens + cacheHitTokens + cacheMissTokens }
+
+    public init(date: String, responseTokens: Double, cacheHitTokens: Double, cacheMissTokens: Double) {
+        self.date = date
+        self.responseTokens = responseTokens
+        self.cacheHitTokens = cacheHitTokens
+        self.cacheMissTokens = cacheMissTokens
+    }
+}
+
+/// 把 by_api_key 的天桶序列聚合成「按天」的滚动趋势。
+/// 与 MonthUsage.aggregated 的区别：不带年月与按模型区分，只保留趋势图需要的按天三个 token 维度，
+/// 且窗口由调用方给定（见 MonthUsage.rollingDayRange），因此趋势可以跨月。
+/// - Parameters:
+///   - startTs/endTs：查询窗口（Unix 秒，左闭右开），窗口外的桶忽略（防御越界数据）
+///   - tzSeconds：桶所属时区的秒偏移（UTC+8 = 28800），决定日期归属
+public func trendSeries(startTs: Int, endTs: Int, tzSeconds: Int, amountData: APIKeyAmountData?)
+    -> [TrendDay] {
+    let timeZone = TimeZone(secondsFromGMT: tzSeconds) ?? MonthUsage.platformTimeZone
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyy-MM-dd"
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = timeZone
+
+    // 平台会对整个窗口补齐空桶（未来日期也返回、值全 0）：先按日期收口，
+    // 空桶会自然聚成 0，趋势图据此保持「一根柱 = 一天」的时间轴
+    var byDay: [String: [String: Double]] = [:]
+    for series in amountData?.series ?? [] {
+        for bucket in series.buckets where bucket.time >= startTs && bucket.time < endTs {
+            let day = formatter.string(from: Date(timeIntervalSince1970: Double(bucket.time)))
+            for (type, value) in bucket.usage {
+                byDay[day, default: [:]][type, default: 0] += value
+            }
+        }
+    }
+
+    return byDay.keys.sorted().map { day in
+        let values = byDay[day] ?? [:]
+        return TrendDay(
+            date: day,
+            responseTokens: values["RESPONSE_TOKEN"] ?? 0,
+            cacheHitTokens: values["PROMPT_CACHE_HIT_TOKEN"] ?? 0,
+            cacheMissTokens: values["PROMPT_CACHE_MISS_TOKEN"] ?? 0
         )
     }
 }
